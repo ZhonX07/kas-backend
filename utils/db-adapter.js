@@ -81,12 +81,43 @@ async function initializeDatabase() {
         `)
         
         if (datePartitionCheck.rows.length === 0) {
-          console.log('🔄 添加 date_partition 生成列...')
+          console.log('🔄 添加 date_partition 字段...')
+          
+          // 添加普通的 DATE 类型字段
           await client.query(`
             ALTER TABLE reports 
-            ADD COLUMN date_partition DATE GENERATED ALWAYS AS (DATE(submittime)) STORED
+            ADD COLUMN date_partition DATE
           `)
-          console.log('✅ date_partition 生成列添加完成')
+          
+          // 为现有数据填充 date_partition（处理旧的BIGINT时间戳）
+          const hasOldTimestamp = await client.query(`
+            SELECT data_type FROM information_schema.columns 
+            WHERE table_name = 'reports' AND column_name = 'submittime'
+          `)
+          
+          if (hasOldTimestamp.rows[0]?.data_type === 'bigint') {
+            // 如果是旧的BIGINT格式
+            await client.query(`
+              UPDATE reports 
+              SET date_partition = DATE(to_timestamp(submittime/1000.0))
+              WHERE date_partition IS NULL
+            `)
+          } else {
+            // 如果是新的TIMESTAMP格式
+            await client.query(`
+              UPDATE reports 
+              SET date_partition = DATE(submittime)
+              WHERE date_partition IS NULL
+            `)
+          }
+          
+          // 设置 NOT NULL 约束
+          await client.query(`
+            ALTER TABLE reports 
+            ALTER COLUMN date_partition SET NOT NULL
+          `)
+          
+          console.log('✅ date_partition 字段添加完成')
         }
         
         // 删除旧的分区字段（如果存在）
@@ -106,7 +137,7 @@ async function initializeDatabase() {
       { 
         name: 'reports_date_class_idx', 
         sql: 'CREATE INDEX IF NOT EXISTS reports_date_class_idx ON reports(date_partition, class)',
-        description: '日期+班级复合索引（使用生成列）'
+        description: '日期+班级复合索引（普通字段）'
       },
       {
         name: 'reports_submittime_idx',
@@ -152,11 +183,15 @@ async function addReport(data) {
   const client = await global.dbContext.instance.connect()
   
   try {
-    // 插入数据，使用CURRENT_TIMESTAMP自动设置提交时间
+    // 在应用端计算日期分区，避免数据库IMMUTABLE限制
+    const now = new Date()
+    const datePartition = now.toISOString().split('T')[0] // YYYY-MM-DD格式
+    
+    // 插入数据，包含日期分区字段
     const query = `
       INSERT INTO reports 
-      (class, isadd, changescore, note, submitter, submittime)
-      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+      (class, isadd, changescore, note, submitter, submittime, date_partition)
+      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6)
       RETURNING id, submittime
     `
     
@@ -165,7 +200,8 @@ async function addReport(data) {
       Boolean(isadd),
       parseInt(changescore),
       note,
-      submitter
+      submitter,
+      datePartition
     ]
     
     const result = await client.query(query, values)
@@ -173,7 +209,8 @@ async function addReport(data) {
     return {
       success: true,
       id: result.rows[0].id,
-      submittime: result.rows[0].submittime
+      submittime: result.rows[0].submittime,
+      date_partition: datePartition
     }
   } finally {
     client.release()
