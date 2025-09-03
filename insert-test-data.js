@@ -21,7 +21,15 @@ const testData = [
   { class: 7, isadd: false, changescore: 3, note: '在走廊大声喧哗', submitter: '李晓鹏' },
   { class: 8, isadd: true, changescore: 4, note: '帮助老师搬运教具', submitter: '李晓鹏' },
   { class: 9, isadd: false, changescore: 2, note: '课堂传纸条', submitter: '李晓鹏' },
-  { class: 10, isadd: true, changescore: 5, note: '组织班级文艺活动', submitter: '李晓鹏' }
+  { class: 10, isadd: true, changescore: 5, note: '组织班级文艺活动', submitter: '李晓鹏' },
+  { class: 15, isadd: true, changescore: 3, note: '主动帮助新同学', submitter: '李晓鹏' },
+  { class: 16, isadd: false, changescore: 4, note: '课间打闹', submitter: '李晓鹏' },
+  { class: 17, isadd: true, changescore: 2, note: '拾金不昧', submitter: '李晓鹏' },
+  { class: 18, isadd: false, changescore: 3, note: '不按时交作业', submitter: '李晓鹏' },
+  { class: 19, isadd: true, changescore: 4, note: '积极参与社团活动', submitter: '李晓鹏' },
+  { class: 21, isadd: false, changescore: 2, note: '带零食进教室', submitter: '李晓鹏' },
+  { class: 22, isadd: true, changescore: 3, note: '主动值日', submitter: '李晓鹏' },
+  { class: 24, isadd: false, changescore: 5, note: '与同学发生冲突', submitter: '李晓鹏' }
 ]
 
 async function insertTestData() {

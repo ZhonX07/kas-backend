@@ -7,6 +7,7 @@ const {
   getReportsByClassAndDateRange 
 } = require('../utils/db-adapter')
 const { asyncHandler, validateRequired, requireDatabase } = require('../utils/middleware')
+const { getHeadteacher, getAllClasses } = require('../utils/headteachers')
 
 const router = express.Router()
 
@@ -20,6 +21,7 @@ router.get('/reports/today/stats', requireDatabase, asyncHandler(async (req, res
     // 1. 获取今日所有通报
     const allReports = await client.query(`
       SELECT 
+        id,
         class,
         isadd,
         changescore,
@@ -31,7 +33,10 @@ router.get('/reports/today/stats', requireDatabase, asyncHandler(async (req, res
       ORDER BY submittime DESC
     `, [today])
     
-    const reports = allReports.rows
+    const reports = allReports.rows.map(report => ({
+      ...report,
+      headteacher: getHeadteacher(report.class) // 注入班主任信息
+    }))
     
     // 2. 统计总数
     const total = reports.length
@@ -66,6 +71,7 @@ router.get('/reports/today/stats', requireDatabase, asyncHandler(async (req, res
       if (!classStats[report.class]) {
         classStats[report.class] = {
           class: report.class,
+          headteacher: report.headteacher,
           totalScore: 0,
           reportCount: 0,
           positiveCount: 0,
@@ -93,6 +99,7 @@ router.get('/reports/today/stats', requireDatabase, asyncHandler(async (req, res
     const recentReports = reports.slice(0, 5).map(report => ({
       id: report.id,
       class: report.class,
+      headteacher: report.headteacher,
       type: report.isadd ? '加分' : '扣分',
       score: report.changescore,
       note: report.note,
@@ -113,6 +120,7 @@ router.get('/reports/today/stats', requireDatabase, asyncHandler(async (req, res
         typeStats,
         classRanking,
         recentReports,
+        allReports: reports, // 包含完整的通报数据
         timestamp: new Date().toISOString()
       }
     })
@@ -135,10 +143,94 @@ router.get('/reports/date/:date', requireDatabase, asyncHandler(async (req, res)
   try {
     const reports = await getReportsByDate(date)
     
+    // 为每条通报注入班主任信息
+    const reportsWithTeachers = reports.map(report => ({
+      ...report,
+      headteacher: getHeadteacher(report.class)
+    }))
+    
+    // 计算统计数据
+    const total = reportsWithTeachers.length
+    const positive = reportsWithTeachers.filter(r => r.isadd).length
+    const negative = reportsWithTeachers.filter(r => !r.isadd).length
+    const activeClasses = [...new Set(reportsWithTeachers.map(r => r.class))].length
+    
+    // 按类型统计
+    const typeStats = {}
+    reportsWithTeachers.forEach(report => {
+      const score = report.changescore
+      let type
+      
+      if (report.isadd) {
+        if (score >= 5) type = '重大表扬'
+        else if (score >= 3) type = '表扬'
+        else type = '小表扬'
+      } else {
+        if (score >= 5) type = '重大违纪'
+        else if (score >= 3) type = '违纪'
+        else type = '小违纪'
+      }
+      
+      typeStats[type] = (typeStats[type] || 0) + 1
+    })
+    
+    // 班级排行
+    const classStats = {}
+    reportsWithTeachers.forEach(report => {
+      if (!classStats[report.class]) {
+        classStats[report.class] = {
+          class: report.class,
+          headteacher: report.headteacher,
+          totalScore: 0,
+          reportCount: 0,
+          positiveCount: 0,
+          negativeCount: 0
+        }
+      }
+      
+      const stat = classStats[report.class]
+      stat.reportCount++
+      
+      if (report.isadd) {
+        stat.totalScore += report.changescore
+        stat.positiveCount++
+      } else {
+        stat.totalScore -= report.changescore
+        stat.negativeCount++
+      }
+    })
+    
+    const classRanking = Object.values(classStats)
+      .sort((a, b) => b.totalScore - a.totalScore)
+    
+    // 最新通报
+    const recentReports = reportsWithTeachers
+      .sort((a, b) => new Date(b.submittime) - new Date(a.submittime))
+      .slice(0, 5)
+      .map(report => ({
+        id: report.id,
+        class: report.class,
+        headteacher: report.headteacher,
+        type: report.isadd ? '加分' : '扣分',
+        score: report.changescore,
+        note: report.note,
+        submitter: report.submitter,
+        time: report.submittime
+      }))
+    
     res.json({
       success: true,
-      data: reports,
-      count: reports.length
+      data: reportsWithTeachers,
+      count: reportsWithTeachers.length,
+      summary: {
+        total,
+        positive,
+        negative,
+        activeClasses
+      },
+      typeStats,
+      classRanking,
+      recentReports
     })
   } catch (error) {
     res.status(500).json({
@@ -204,6 +296,23 @@ router.get('/reports/class/:classNum/range/:startDate/:endDate', requireDatabase
     res.status(500).json({
       success: false,
       message: '获取通报失败'
+    })
+  }
+}))
+
+// 获取所有班级列表（包含班主任信息）
+router.get('/classes', asyncHandler(async (req, res) => {
+  try {
+    const classes = getAllClasses()
+    
+    res.json({
+      success: true,
+      data: classes
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: '获取班级列表失败'
     })
   }
 }))

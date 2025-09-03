@@ -44,7 +44,8 @@ async function initializeDatabase() {
           date_partition DATE GENERATED ALWAYS AS (DATE(submittime)) STORED
         )
       `)
-      console.log('✅ 创建 reports 表成功')      } else {
+      console.log('✅ 创建 reports 表成功')
+    } else {
         // 检查是否需要迁移旧的BIGINT时间戳
         const columnCheck = await client.query(`
           SELECT column_name, data_type FROM information_schema.columns 
@@ -296,11 +297,99 @@ async function getReportsByClassAndDateRange(classNum, startDate, endDate) {
   }
 }
 
+// 获取指定用户在某个日期范围内的报告
+async function getReportsByUserAndDateRange(userId, startDate, endDate) {
+  const client = await global.dbContext.instance.connect()
+  
+  try {
+    // 修复查询语法
+    const result = await client.query(`
+      SELECT * FROM reports 
+      WHERE user_id = $1 AND submit_date BETWEEN $2 AND $3
+      ORDER BY submit_date DESC
+    `, [userId, startDate, endDate]);
+
+    return result.rows;
+  } finally {
+    client.release()
+  }
+}
+
+// 获取指定日期范围内的报告
+async function getReportsByDateRange(startDate, endDate) {
+    try {
+        const result = await pool.query(`
+            SELECT * FROM reports 
+            WHERE submit_date BETWEEN $1 AND $2
+            ORDER BY submit_date DESC
+        `, [startDate, endDate]);
+        return result.rows;
+    } catch (error) {
+        throw error;
+    }
+}
+
+// 更新报告状态
+async function updateReportStatus(reportId, status) {
+    try {
+        const result = await pool.query(`
+            UPDATE reports 
+            SET status = $1, updated_at = NOW()
+            WHERE id = $2
+            RETURNING *
+        `, [status, reportId]);
+        return result.rows[0];
+    } catch (error) {
+        throw error;
+    }
+}
+
+// 删除报告
+async function deleteReport(reportId) {
+    try {
+        const result = await pool.query(`
+            DELETE FROM reports 
+            WHERE id = $1
+            RETURNING *
+        `, [reportId]);
+        return result.rows[0];
+    } catch (error) {
+        throw error;
+    }
+}
+
+// 获取所有报告（带用户信息）
+async function getAllReportsWithUser() {
+    const client = await global.dbContext.instance.connect()
+    
+    try {
+      // 修复未终止的模板字面量
+      const query = `
+        SELECT r.*, u.username 
+        FROM reports r 
+        JOIN users u ON r.user_id = u.id 
+        WHERE r.status = $1
+        ORDER BY r.submit_date DESC
+      `;
+      
+      const result = await client.query(query, ['active'])
+      
+      return result.rows
+    } finally {
+      client.release()
+    }
+}
+
 module.exports = {
   initializeDatabase,
   addReport,
   getReportsByMonth,
   getReportsByDate,
   getReportsByDateAndClass,
-  getReportsByClassAndDateRange
+  getReportsByClassAndDateRange,
+  getReportsByUserAndDateRange,
+  getReportsByDateRange,
+  updateReportStatus,
+  deleteReport,
+  getAllReportsWithUser
 }

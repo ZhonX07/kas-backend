@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const dbAdapter = require('../utils/db-adapter')
+const { getHeadteacher } = require('../utils/headteachers')
 
 // 提交通报数据
 router.post('/inputdata', async (req, res) => {
