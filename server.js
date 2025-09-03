@@ -130,7 +130,11 @@ app.get('/', (req, res) => {
     dbType: dbContext.type,
     endpoints: [
       'POST /api/login - TOTP登录验证',
-      'POST /api/inputdata - 提交通报数据'
+      'POST /api/inputdata - 提交通报数据',
+      'GET /api/reports/:yearMonth - 获取特定月份的通报',
+      'GET /api/reports/date/:date - 获取特定日期的通报',
+      'GET /api/reports/date/:date/class/:classNum - 获取特定日期和班级的通报',
+      'GET /api/reports/class/:classNum/range/:startDate/:endDate - 获取班级在日期范围内的通报'
     ]
   })
 })
@@ -169,6 +173,11 @@ async function startApp() {
   try {
     // 先初始化数据库
     await initDatabase()
+    
+    // 运行数据库迁移
+    console.log('运行数据库迁移...')
+    const { migrateDatabase } = require('./utils/db-migration')
+    await migrateDatabase()
     
     // 然后启动服务器
     app.listen(PORT, () => {
