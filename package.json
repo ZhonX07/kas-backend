@@ -8,7 +8,8 @@
     "dev:sqlite": "DB_TYPE=sqlite node server.js",
     "dev:pg": "DB_TYPE=postgres node server.js",
     "test:db": "node test-db-performance.js",
-    "db:reset": "node reset-database.js"
+    "db:reset": "node reset-database.js",
+    "test:data": "node insert-test-data.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

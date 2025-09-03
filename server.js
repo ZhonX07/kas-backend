@@ -90,14 +90,17 @@ function registerRoute(method, path, description) {
 // 导入路由
 const authRouter = require('./API/auth')
 const inputdataRouter = require('./API/inputdata')
+const reportsRouter = require('./API/reports')
 
 // 使用路由
 app.use('/api', authRouter)
 app.use('/api', inputdataRouter)
+app.use('/api', reportsRouter)
 
 // 注册路由信息（手动维护，避免使用内部API）
 registerRoute('POST', '/api/login', 'TOTP登录验证')
 registerRoute('POST', '/api/inputdata', '提交通报数据')
+registerRoute('GET', '/api/reports/today/stats', '获取今日统计数据')
 registerRoute('GET', '/api/reports/:yearMonth', '获取特定月份的通报')
 registerRoute('GET', '/api/reports/date/:date', '获取特定日期的通报')
 registerRoute('GET', '/api/reports/date/:date/class/:classNum', '获取特定日期和班级的通报')
