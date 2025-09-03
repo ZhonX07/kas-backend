@@ -136,6 +136,94 @@ router.get('/reports/today/stats', requireDatabase, asyncHandler(async (req, res
   }
 }))
 
+// 获取今日明细数据 - 返回完整的通报列表
+router.get('/reports/today/details', requireDatabase, asyncHandler(async (req, res) => {
+  const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD格式
+  
+  const client = await global.dbContext.instance.connect()
+  
+  try {
+    // 获取今日所有通报明细
+    const allReports = await client.query(`
+      SELECT 
+        id,
+        class,
+        isadd,
+        changescore,
+        note,
+        submitter,
+        submittime,
+        date_partition
+      FROM reports 
+      WHERE date_partition = $1
+      ORDER BY submittime DESC
+    `, [today])
+    
+    // 为每条通报注入班主任信息并格式化数据
+    const detailReports = allReports.rows.map(report => ({
+      id: report.id,
+      class: report.class,
+      headteacher: getHeadteacher(report.class),
+      type: report.isadd ? '表彰' : '违纪',
+      nature: report.isadd ? 'praise' : 'criticism',
+      score: report.isadd ? report.changescore : -report.changescore,
+      actualScore: report.changescore, // 原始分数（用于后端计算）
+      note: report.note,
+      submitter: report.submitter,
+      submittime: report.submittime,
+      date: report.date_partition,
+      // 根据分数范围确定类型级别
+      level: (() => {
+        const score = report.changescore
+        if (report.isadd) {
+          if (score >= 5) return '重大表彰'
+          else if (score >= 3) return '表彰'
+          else return '小表彰'
+        } else {
+          if (score >= 5) return '重大违纪'
+          else if (score >= 3) return '违纪'
+          else return '小违纪'
+        }
+      })()
+    }))
+    
+    // 按类型分类
+    const praiseReports = detailReports.filter(r => r.nature === 'praise')
+    const criticismReports = detailReports.filter(r => r.nature === 'criticism')
+    
+    // 统计信息
+    const summary = {
+      total: detailReports.length,
+      praise: praiseReports.length,
+      criticism: criticismReports.length,
+      totalPraiseScore: praiseReports.reduce((sum, r) => sum + r.actualScore, 0),
+      totalCriticismScore: criticismReports.reduce((sum, r) => sum + r.actualScore, 0),
+      activeClasses: [...new Set(detailReports.map(r => r.class))].length
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        date: today,
+        summary,
+        allReports: detailReports,
+        praiseReports,
+        criticismReports
+      },
+      timestamp: new Date().toISOString()
+    })
+    
+  } catch (error) {
+    console.error('获取今日明细失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取今日明细失败'
+    })
+  } finally {
+    client.release()
+  }
+}))
+
 // 获取特定日期的通报
 router.get('/reports/date/:date', requireDatabase, asyncHandler(async (req, res) => {
   const { date } = req.params
