@@ -30,7 +30,7 @@ async function initializeDatabase() {
     `)
     
     if (!tableCheck.rows[0].exists) {
-      // 创建新表，使用优化的字段类型
+      // 创建新表，使用优化的字段类型和生成列
       await client.query(`
         CREATE TABLE reports (
           id SERIAL PRIMARY KEY,
@@ -39,58 +39,74 @@ async function initializeDatabase() {
           changescore INTEGER NOT NULL,
           submittime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           note TEXT NOT NULL,
-          submitter TEXT NOT NULL
+          submitter TEXT NOT NULL,
+          -- 生成列：自动从 submittime 计算日期，支持高效索引
+          date_partition DATE GENERATED ALWAYS AS (DATE(submittime)) STORED
         )
       `)
-      console.log('✅ 创建 reports 表成功')
-    } else {
-      // 检查是否需要迁移旧的BIGINT时间戳
-      const columnCheck = await client.query(`
-        SELECT column_name, data_type FROM information_schema.columns 
-        WHERE table_name = 'reports' AND column_name = 'submittime'
-      `)
-      
-      if (columnCheck.rows.length > 0 && columnCheck.rows[0].data_type === 'bigint') {
-        console.log('🔄 检测到旧的BIGINT时间戳格式，开始迁移...')
-        
-        // 添加新的TIMESTAMP列
-        await client.query(`ALTER TABLE reports ADD COLUMN submittime_new TIMESTAMP WITH TIME ZONE`)
-        
-        // 转换数据
-        await client.query(`
-          UPDATE reports 
-          SET submittime_new = to_timestamp(submittime/1000.0)
-          WHERE submittime_new IS NULL
+      console.log('✅ 创建 reports 表成功')      } else {
+        // 检查是否需要迁移旧的BIGINT时间戳
+        const columnCheck = await client.query(`
+          SELECT column_name, data_type FROM information_schema.columns 
+          WHERE table_name = 'reports' AND column_name = 'submittime'
         `)
         
-        // 删除旧列，重命名新列
-        await client.query(`ALTER TABLE reports DROP COLUMN submittime`)
-        await client.query(`ALTER TABLE reports RENAME COLUMN submittime_new TO submittime`)
+        if (columnCheck.rows.length > 0 && columnCheck.rows[0].data_type === 'bigint') {
+          console.log('🔄 检测到旧的BIGINT时间戳格式，开始迁移...')
+          
+          // 添加新的TIMESTAMP列
+          await client.query(`ALTER TABLE reports ADD COLUMN submittime_new TIMESTAMP WITH TIME ZONE`)
+          
+          // 转换数据
+          await client.query(`
+            UPDATE reports 
+            SET submittime_new = to_timestamp(submittime/1000.0)
+            WHERE submittime_new IS NULL
+          `)
+          
+          // 删除旧列，重命名新列
+          await client.query(`ALTER TABLE reports DROP COLUMN submittime`)
+          await client.query(`ALTER TABLE reports RENAME COLUMN submittime_new TO submittime`)
+          
+          // 设置默认值
+          await client.query(`ALTER TABLE reports ALTER COLUMN submittime SET DEFAULT CURRENT_TIMESTAMP`)
+          
+          console.log('✅ 时间戳格式迁移完成')
+        }
         
-        // 设置默认值
-        await client.query(`ALTER TABLE reports ALTER COLUMN submittime SET DEFAULT CURRENT_TIMESTAMP`)
+        // 检查并添加 date_partition 生成列（如果不存在）
+        const datePartitionCheck = await client.query(`
+          SELECT column_name FROM information_schema.columns 
+          WHERE table_name = 'reports' AND column_name = 'date_partition'
+        `)
         
-        console.log('✅ 时间戳格式迁移完成')
+        if (datePartitionCheck.rows.length === 0) {
+          console.log('🔄 添加 date_partition 生成列...')
+          await client.query(`
+            ALTER TABLE reports 
+            ADD COLUMN date_partition DATE GENERATED ALWAYS AS (DATE(submittime)) STORED
+          `)
+          console.log('✅ date_partition 生成列添加完成')
+        }
+        
+        // 删除旧的分区字段（如果存在）
+        const oldPartitionColumns = await client.query(`
+          SELECT column_name FROM information_schema.columns 
+          WHERE table_name = 'reports' AND column_name IN ('month_partition')
+        `)
+        
+        for (const row of oldPartitionColumns.rows) {
+          await client.query(`ALTER TABLE reports DROP COLUMN IF EXISTS ${row.column_name}`)
+          console.log(`🗑️ 删除冗余字段: ${row.column_name}`)
+        }
       }
-      
-      // 删除旧的分区字段（如果存在）
-      const partitionColumns = await client.query(`
-        SELECT column_name FROM information_schema.columns 
-        WHERE table_name = 'reports' AND column_name IN ('month_partition', 'date_partition')
-      `)
-      
-      for (const row of partitionColumns.rows) {
-        await client.query(`ALTER TABLE reports DROP COLUMN IF EXISTS ${row.column_name}`)
-        console.log(`🗑️ 删除冗余字段: ${row.column_name}`)
-      }
-    }
     
-    // 创建优化的索引（只保留必要的）
+    // 创建优化的索引（使用生成列，避免IMMUTABLE问题）
     const indexes = [
       { 
         name: 'reports_date_class_idx', 
-        sql: 'CREATE INDEX IF NOT EXISTS reports_date_class_idx ON reports(DATE(submittime), class)',
-        description: '日期+班级复合索引'
+        sql: 'CREATE INDEX IF NOT EXISTS reports_date_class_idx ON reports(date_partition, class)',
+        description: '日期+班级复合索引（使用生成列）'
       },
       {
         name: 'reports_submittime_idx',
@@ -101,6 +117,11 @@ async function initializeDatabase() {
         name: 'reports_class_idx',
         sql: 'CREATE INDEX IF NOT EXISTS reports_class_idx ON reports(class)',
         description: '班级索引'
+      },
+      {
+        name: 'reports_date_partition_idx',
+        sql: 'CREATE INDEX IF NOT EXISTS reports_date_partition_idx ON reports(date_partition)',
+        description: '日期分区索引'
       }
     ]
     
@@ -184,10 +205,10 @@ async function getReportsByDate(date) {
   const client = await global.dbContext.instance.connect()
   
   try {
-    // 使用PostgreSQL的DATE函数直接从submittime提取日期
+    // 使用生成的 date_partition 列，享受索引优化
     const query = `
       SELECT * FROM reports 
-      WHERE DATE(submittime) = $1::date
+      WHERE date_partition = $1::date
       ORDER BY submittime DESC
     `
     
@@ -204,10 +225,10 @@ async function getReportsByDateAndClass(date, classNum) {
   const client = await global.dbContext.instance.connect()
   
   try {
-    // 这个查询会使用我们的复合索引 reports_date_class_idx
+    // 这个查询会使用我们的复合索引 reports_date_class_idx(date_partition, class)
     const query = `
       SELECT * FROM reports 
-      WHERE DATE(submittime) = $1::date AND class = $2
+      WHERE date_partition = $1::date AND class = $2
       ORDER BY submittime DESC
     `
     
@@ -226,7 +247,7 @@ async function getReportsByClassAndDateRange(classNum, startDate, endDate) {
   try {
     const query = `
       SELECT * FROM reports 
-      WHERE class = $1 AND DATE(submittime) BETWEEN $2::date AND $3::date
+      WHERE class = $1 AND date_partition BETWEEN $2::date AND $3::date
       ORDER BY submittime DESC
     `
     

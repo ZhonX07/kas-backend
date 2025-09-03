@@ -6,7 +6,8 @@
     "start": "node server.js",
     "dev": "node server.js",
     "dev:sqlite": "DB_TYPE=sqlite node server.js",
-    "dev:pg": "DB_TYPE=postgres node server.js"
+    "dev:pg": "DB_TYPE=postgres node server.js",
+    "test:db": "node test-db-performance.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
