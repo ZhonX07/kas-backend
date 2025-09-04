@@ -8,6 +8,7 @@ const {
 } = require('../utils/db-adapter')
 const { asyncHandler, validateRequired, requireDatabase } = require('../utils/middleware')
 const { getHeadteacher, getAllClasses } = require('../utils/headteachers')
+const { broadcastReport } = require('../websocket')
 
 const router = express.Router()
 
@@ -404,5 +405,19 @@ router.get('/classes', asyncHandler(async (req, res) => {
     })
   }
 }))
+
+// 示例：在提交报告的路由中添加广播功能
+router.post('/submit', async (req, res) => {
+  try {
+    // ...existing submission logic...
+    
+    // 假设提交成功后有一个newReport对象
+    // broadcastReport(newReport)
+    
+    // ...existing response logic...
+  } catch (error) {
+    // ...existing error handling...
+  }
+})
 
 module.exports = router
