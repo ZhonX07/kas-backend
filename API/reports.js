@@ -420,4 +420,60 @@ router.post('/submit', async (req, res) => {
   }
 })
 
+// 添加数据输入路由 - 用于提交新的通报
+router.post('/inputdata', requireDatabase, validateRequired(['class', 'isadd', 'changescore', 'note']), asyncHandler(async (req, res) => {
+  try {
+    const { class: classNum, isadd, changescore, note, submitter } = req.body
+    
+    // 验证数据
+    if (!classNum || typeof isadd !== 'boolean' || !changescore || !note) {
+      return res.status(400).json({
+        success: false,
+        message: '请填写所有必填字段'
+      })
+    }
+    
+    // 验证分数范围
+    if (changescore < 1 || changescore > 20) {
+      return res.status(400).json({
+        success: false,
+        message: '分数必须在1-20之间'
+      })
+    }
+    
+    // 准备插入数据
+    const reportData = {
+      class: parseInt(classNum),
+      isadd: Boolean(isadd),
+      changescore: parseInt(changescore),
+      note: note.trim(),
+      submitter: submitter || '系统用户'
+    }
+    
+    // 调用数据库插入方法
+    const newReport = await addReport(reportData)
+    
+    // 广播到WebSocket客户端
+    try {
+      broadcastReport(newReport)
+      console.log('已广播新通报到WebSocket客户端')
+    } catch (broadcastError) {
+      console.warn('WebSocket广播失败:', broadcastError)
+    }
+    
+    res.json({
+      success: true,
+      message: '通报提交成功',
+      data: newReport
+    })
+    
+  } catch (error) {
+    console.error('提交通报失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '提交通报失败: ' + error.message
+    })
+  }
+}))
+
 module.exports = router
