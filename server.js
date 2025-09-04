@@ -1,5 +1,6 @@
 require('dotenv').config()
 const express = require('express')
+const http = require('http')
 const cors = require('cors')
 const { Pool } = require('pg')
 const { initializeDatabase } = require('./utils/db-adapter')
@@ -212,12 +213,53 @@ async function startApp() {
     await initializeDatabase()
     
     // 3. 启动HTTP服务器
-    const server = app.listen(PORT, () => {
+    const server = http.createServer(app)
+    
+    // 4. 初始化WebSocket服务
+    const WebSocket = require('ws')
+    const wss = new WebSocket.Server({ server })
+    
+    wss.on('connection', (ws) => {
+      console.log('📡 WebSocket客户端已连接')
+      
+      ws.on('message', (message) => {
+        try {
+          const data = JSON.parse(message)
+          console.log('收到WebSocket消息:', data)
+          
+          if (data.type === 'subscribe') {
+            ws.subscribed = true
+            ws.send(JSON.stringify({
+              type: 'subscribed',
+              message: '已订阅实时通报'
+            }))
+          }
+        } catch (error) {
+          console.error('WebSocket消息解析失败:', error)
+        }
+      })
+      
+      ws.on('close', () => {
+        console.log('📡 WebSocket客户端已断开')
+      })
+      
+      // 发送连接确认消息
+      ws.send(JSON.stringify({
+        type: 'connected',
+        message: '已连接到实时通报系统'
+      }))
+    })
+    
+    // 保存WebSocket实例供其他模块使用
+    global.wss = wss
+    
+    server.listen(PORT, () => {
       console.log(`✅ KAS Backend Server 运行在端口 ${PORT}`)
       console.log(`📍 API根地址: http://localhost:${PORT}`)
       console.log(`🔍 健康检查: http://localhost:${PORT}/health`)
       console.log(`📚 API文档: http://localhost:${PORT}/`)
       console.log(`🗄️  数据库: PostgreSQL (${process.env.PGHOST}:${process.env.PGPORT})`)
+      console.log(`📡 WebSocket: ws://localhost:${PORT}`)
     })
     
     // 设置服务器超时
