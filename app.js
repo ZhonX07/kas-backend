@@ -1,11 +1,21 @@
 const http = require('http')
 const express = require('express')
+const cors = require('cors')
 const bodyParser = require('body-parser')
 
 // 引入WebSocket模块
 const { initWebSocket } = require('./websocket')
 
 const app = express()
+
+// CORS配置
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}))
+
 app.use(bodyParser.json())
 
 // 登录路由
