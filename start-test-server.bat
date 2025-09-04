@@ -21,6 +21,9 @@ if not exist "node_modules" (
 :: 启动测试服务器
 echo ⚡ 启动测试服务器在端口8080...
 echo.
+echo 请确保端口8080未被占用...
+netstat -an | findstr :8080
+echo.
 node test-simple-server.js
 
 pause
