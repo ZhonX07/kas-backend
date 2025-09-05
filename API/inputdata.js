@@ -5,8 +5,8 @@ const { getHeadteacher } = require('../utils/headteachers')
 
 console.log('📝 加载 inputdata 路由模块...')
 
-// 提交通报数据 - 确保路由路径正确
-router.post('/api/inputdata', async (req, res) => {
+// 提交通报数据 - 修正路由路径，移除前导的 /api 
+router.post('/inputdata', async (req, res) => {
   console.log('📝 收到通报提交请求:', req.body)
   console.log('📍 请求路径:', req.originalUrl)
   
@@ -68,8 +68,8 @@ router.post('/api/inputdata', async (req, res) => {
   }
 })
 
-// 调试路由 - 列出所有注册的路由
-router.get('/api/debug/routes', (req, res) => {
+// 调试路由 - 修正路径
+router.get('/debug/routes', (req, res) => {
   res.json({
     success: true,
     message: 'inputdata 路由模块已加载',

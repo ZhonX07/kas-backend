@@ -57,11 +57,11 @@ app.use((req, res, next) => {
   next()
 })
 
-// 先注册输入数据路由（包含 /api/inputdata）
+// 修正输入数据路由注册 - 挂载在 /api 前缀下
 try {
   const inputDataRouter = require('./API/inputdata')
-  app.use('/', inputDataRouter)  // 直接挂载，因为inputdata.js中已经有完整路径
-  console.log('✅ inputdata 路由已注册')
+  app.use('/api', inputDataRouter)  // 将路由挂载到 /api 前缀下
+  console.log('✅ inputdata 路由已注册在 /api 前缀下')
 } catch (error) {
   console.error('❌ inputdata 路由注册失败:', error)
 }
