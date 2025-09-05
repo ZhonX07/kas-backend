@@ -323,10 +323,11 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('  POST /login - 用户登录')
   console.log('  POST /api/login - TOTP登录')
   console.log('  GET  /api/classes - 班级列表')
-  console.log('  POST /api/inputdata - 提交通报')
+  console.log('  POST /api/inputdata - 提交通报 ⭐️')
   console.log('  GET  /api/reports/today/stats - 今日统计')
   console.log('  GET  /api/reports/today/details - 今日详情')
   console.log('\n🔄 服务器正在运行，等待连接...')
+  console.log('\n⚠️  请确保使用这个测试服务器而不是主服务器来测试提交功能')
 })
 
 // 优雅关闭

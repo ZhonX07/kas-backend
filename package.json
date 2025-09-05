@@ -13,13 +13,13 @@
     "check": "npm run lint && npm run format"
   },
   "dependencies": {
-    "express": "4.17.3",
+    "body-parser": "^1.20.2",
     "cors": "^2.8.5",
-    "pg": "^8.11.0",
-    "ws": "^8.14.0",
-    "otplib": "^12.0.1",
     "dotenv": "^16.3.1",
-    "body-parser": "^1.20.2"
+    "express": "4.17.3",
+    "otplib": "^12.0.1",
+    "pg": "^8.11.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "eslint": "^8.50.0",
@@ -43,7 +43,9 @@
       "path-to-regexp": "6.2.1"
     },
     "peerDependencyRules": {
-      "ignoreMissing": ["path-to-regexp"]
+      "ignoreMissing": [
+        "path-to-regexp"
+      ]
     }
   }
 }
