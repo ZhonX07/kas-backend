@@ -1,25 +1,44 @@
 {
   "name": "kas-backend",
   "version": "1.0.0",
+  "description": "KAS系统后端服务",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
-    "dev:sqlite": "DB_TYPE=sqlite node server.js",
-    "dev:pg": "DB_TYPE=postgres node server.js",
-    "test:db": "node test-db-performance.js",
-    "db:reset": "node reset-database.js",
-    "test:data": "node insert-test-data.js"
+    "dev": "nodemon server.js",
+    "reset-db": "node reset-database.js",
+    "test-data": "node insert-test-data.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "check": "npm run lint && npm run format"
   },
   "dependencies": {
+    "express": "^4.18.2",
     "cors": "^2.8.5",
-    "encoding": "^0.1.13",
-    "express": "^5.1.0",
+    "pg": "^8.11.0",
+    "ws": "^8.14.0",
     "otplib": "^12.0.1",
-    "pg": "^8.16.3",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "body-parser": "^1.20.2"
   },
   "devDependencies": {
-    "exceljs": "4.4.0"
+    "eslint": "^8.50.0",
+    "nodemon": "^3.0.1",
+    "prettier": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "KAS Team",
+  "license": "MIT",
+  "keywords": [
+    "kas",
+    "backend",
+    "api",
+    "express",
+    "postgresql"
+  ],
+  "overrides": {
+    "path-to-regexp": "6.2.1"
   }
 }

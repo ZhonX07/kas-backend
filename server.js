@@ -150,8 +150,9 @@ async function startServer() {
     const server = app.listen(PORT, HOST, () => {
       console.log(`🚀 服务器运行在 ${HOST}:${PORT}`)
       console.log(`🔗 健康检查: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/health`)
-      console.log(`🌍 环境: ${process.env.NODE_ENV}`)
+      console.log(`🌍 环境: ${process.env.NODE_ENV || 'development'}`)
       console.log(`📊 数据库: ${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`)
+      console.log(`📡 CORS允许的源: ${process.env.CORS_ALLOWED_ORIGINS || 'default'}`)
     })
 
     // 设置WebSocket
@@ -172,6 +173,15 @@ async function startServer() {
 
   } catch (error) {
     console.error('❌ 服务器启动失败:', error)
+    
+    // 如果是路由相关错误，给出更具体的提示
+    if (error.message.includes('path-to-regexp') || error.message.includes('parameter name')) {
+      console.error('💡 可能的解决方案:')
+      console.error('   1. 检查路由定义中的参数格式')
+      console.error('   2. 确保所有路由参数都有正确的名称')
+      console.error('   3. 尝试降级 path-to-regexp 版本')
+    }
+    
     process.exit(1)
   }
 }
