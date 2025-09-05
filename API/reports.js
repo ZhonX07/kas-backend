@@ -12,7 +12,7 @@ const { broadcastReport } = require('../websocket')
 
 const router = express.Router()
 
-// 获取历史记录（按班级和日期范围查询）
+// 获取历史记录（按班级和日期范围查询）- 移到更前面，避免被 /:yearMonth 路由匹配
 router.get('/reports/history', requireDatabase, asyncHandler(async (req, res) => {
   const { classId, startDate, endDate, isadd, minScore, maxScore } = req.query
   
@@ -78,6 +78,8 @@ router.get('/reports/history', requireDatabase, asyncHandler(async (req, res) =>
       LIMIT 1000
     `
     
+    console.log('执行历史记录查询:', query, queryParams)
+    
     const result = await client.query(query, queryParams)
     
     // 为每条记录注入班主任信息和违纪类型显示
@@ -120,7 +122,7 @@ router.get('/reports/history', requireDatabase, asyncHandler(async (req, res) =>
     console.error('获取历史记录失败:', error)
     res.status(500).json({
       success: false,
-      message: '获取历史记录失败'
+      message: '获取历史记录失败: ' + error.message
     })
   }
 }))

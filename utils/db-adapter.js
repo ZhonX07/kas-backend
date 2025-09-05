@@ -90,7 +90,7 @@ async function initializeDatabase() {
         console.log('✅ 时间戳格式迁移完成')
       }
       
-      // 检查并添加 date_partition 生成列（如果不存在）
+      // 检查并添加 date_partition 字段（如果不存在）
       const datePartitionCheck = await client.query(`
         SELECT column_name FROM information_schema.columns 
         WHERE table_name = 'reports' AND column_name = 'date_partition'
@@ -105,7 +105,7 @@ async function initializeDatabase() {
           ADD COLUMN date_partition DATE
         `)
         
-        // 为现有数据填充 date_partition（处理旧的BIGINT时间戳）
+        // 为现有数据填充 date_partition
         const hasOldTimestamp = await client.query(`
           SELECT data_type FROM information_schema.columns 
           WHERE table_name = 'reports' AND column_name = 'submittime'
@@ -148,43 +148,43 @@ async function initializeDatabase() {
       }
     }
   
-  // 创建优化的索引（使用生成列，避免IMMUTABLE问题）
-  const indexes = [
-    { 
-      name: 'reports_date_class_idx', 
-      sql: 'CREATE INDEX IF NOT EXISTS reports_date_class_idx ON reports(date_partition, class)',
-      description: '日期+班级复合索引（普通字段）'
-    },
-    {
-      name: 'reports_submittime_idx',
-      sql: 'CREATE INDEX IF NOT EXISTS reports_submittime_idx ON reports(submittime)',
-      description: '时间戳索引'
-    },
-    {
-      name: 'reports_class_idx',
-      sql: 'CREATE INDEX IF NOT EXISTS reports_class_idx ON reports(class)',
-      description: '班级索引'
-    },
-    {
-      name: 'reports_date_partition_idx',
-      sql: 'CREATE INDEX IF NOT EXISTS reports_date_partition_idx ON reports(date_partition)',
-      description: '日期分区索引'
+    // 创建优化的索引（使用生成列，避免IMMUTABLE问题）
+    const indexes = [
+      { 
+        name: 'reports_date_class_idx', 
+        sql: 'CREATE INDEX IF NOT EXISTS reports_date_class_idx ON reports(date_partition, class)',
+        description: '日期+班级复合索引（普通字段）'
+      },
+      {
+        name: 'reports_submittime_idx',
+        sql: 'CREATE INDEX IF NOT EXISTS reports_submittime_idx ON reports(submittime)',
+        description: '时间戳索引'
+      },
+      {
+        name: 'reports_class_idx',
+        sql: 'CREATE INDEX IF NOT EXISTS reports_class_idx ON reports(class)',
+        description: '班级索引'
+      },
+      {
+        name: 'reports_date_partition_idx',
+        sql: 'CREATE INDEX IF NOT EXISTS reports_date_partition_idx ON reports(date_partition)',
+        description: '日期分区索引'
+      }
+    ]
+    
+    for (const index of indexes) {
+      try {
+        await client.query(index.sql)
+        console.log(`✅ 创建索引: ${index.name} - ${index.description}`)
+      } catch (error) {
+        console.log(`❌ 创建索引 ${index.name} 失败:`, error.message)
+      }
     }
-  ]
-  
-  for (const index of indexes) {
-    try {
-      await client.query(index.sql)
-      console.log(`✅ 创建索引: ${index.name} - ${index.description}`)
-    } catch (error) {
-      console.log(`❌ 创建索引 ${index.name} 失败:`, error.message)
-    }
-  }
-  
-  isInitialized = true
-  console.log('🎉 数据库初始化完成')
-  
-} catch (error) {
+    
+    isInitialized = true
+    console.log('🎉 数据库初始化完成')
+    
+  } catch (error) {
     console.error('❌ 数据库初始化失败:', error)
     throw error
   } finally {
