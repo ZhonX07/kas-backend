@@ -40,8 +40,44 @@ function requireDatabase(req, res, next) {
   next()
 }
 
+// CORS中间件 - 更宽松的跨域策略
+const corsMiddleware = (req, res, next) => {
+  const origin = req.headers.origin
+  
+  // 允许的域名列表
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:3000',
+    'http://117.72.79.92:5173',
+    'http://117.72.79.92:3000',
+    'http://117.72.79.92'
+  ]
+  
+  // 检查是否为允许的域名或本地开发环境
+  if (!origin || 
+      allowedOrigins.includes(origin) || 
+      /^http:\/\/localhost:\d+$/.test(origin) ||
+      /^http:\/\/127\.0\.0\.1:\d+$/.test(origin) ||
+      /^http:\/\/117\.72\.79\.92:\d+$/.test(origin)) {
+    
+    res.setHeader('Access-Control-Allow-Origin', origin || '*')
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin')
+  }
+  
+  // 处理预检请求
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200)
+  } else {
+    next()
+  }
+}
+
 module.exports = {
   asyncHandler,
   validateRequired,
-  requireDatabase
+  requireDatabase,
+  corsMiddleware
 }
