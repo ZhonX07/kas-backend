@@ -81,8 +81,25 @@ router.get('/api/debug/routes', (req, res) => {
   })
 })
 
-console.log('✅ inputdata 路由模块加载完成')
-module.exports = router
+// 查询接口 - 获取特定月份的通报 - 修复路径参数
+router.get('/reports/:yearMonth([0-9]{4}-[0-9]{2})', async (req, res) => {
+  try {
+    const { yearMonth } = req.params
+
+    // 使用数据库适配器获取报告
+    const reports = await dbAdapter.getReportsByMonth(yearMonth)
+
+    res.json({
+      success: true,
+      data: reports
+    })
+  } catch (error) {
+    console.error('获取报告错误:', error)
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误'
+    })
+  }
 })
 
 // 查询接口 - 获取特定日期的通报 - 修复路径参数
@@ -196,4 +213,5 @@ router.get('/reports/class/:classNum/range/:startDate/:endDate', async (req, res
   }
 })
 
+console.log('✅ inputdata 路由模块加载完成')
 module.exports = router
