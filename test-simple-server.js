@@ -139,6 +139,85 @@ app.get('/api/reports/today/details', (req, res) => {
   })
 })
 
+// 模拟班级列表
+app.get('/api/classes', (req, res) => {
+  console.log('获取班级列表')
+  
+  const classes = Array.from({ length: 18 }, (_, i) => ({
+    class: i + 1,
+    headteacher: `班主任${i + 1}`
+  }))
+  
+  res.json({
+    success: true,
+    data: classes
+  })
+})
+
+// 提交通报数据端点 - 这是缺失的关键端点
+app.post('/api/inputdata', (req, res) => {
+  console.log('📝 收到通报提交请求:', req.body)
+  
+  const { class: classNum, isadd, changescore, note, submitter, reducetype } = req.body
+  
+  // 验证必需字段
+  if (!classNum || isadd === undefined || !changescore || !note || !submitter) {
+    console.log('❌ 缺少必需字段:', { classNum, isadd, changescore, note, submitter })
+    return res.status(400).json({
+      success: false,
+      message: '缺少必需字段',
+      received: { classNum, isadd, changescore, note, submitter }
+    })
+  }
+
+  // 验证数据范围
+  if (changescore < 1 || changescore > 20) {
+    return res.status(400).json({
+      success: false,
+      message: '分数必须在1-20之间'
+    })
+  }
+
+  // 模拟成功响应
+  const result = {
+    id: Math.floor(Math.random() * 10000) + 1,
+    database: new Date().toISOString().slice(0, 7), // YYYY-MM
+    submittime: new Date().toISOString(),
+    class: parseInt(classNum),
+    headteacher: `班主任${classNum}`
+  }
+
+  console.log(`✅ 模拟数据插入成功, 记录ID: ${result.id}`)
+
+  // 广播新通报给所有WebSocket客户端
+  const newReport = {
+    id: result.id,
+    class: parseInt(classNum),
+    isadd,
+    changescore: parseInt(changescore),
+    note,
+    submitter,
+    submittime: result.submittime
+  }
+
+  // 发送给所有订阅的WebSocket客户端
+  wss.clients.forEach((ws) => {
+    if (ws.readyState === WebSocket.OPEN && ws.subscribed) {
+      ws.send(JSON.stringify({
+        type: 'new-report',
+        data: newReport,
+        message: '新通报已提交'
+      }))
+    }
+  })
+
+  res.json({
+    success: true,
+    message: '数据提交成功',
+    data: result
+  })
+})
+
 // 错误处理
 app.use((err, req, res, next) => {
   console.error('服务器错误:', err)
@@ -153,7 +232,16 @@ app.use('*', (req, res) => {
   console.log(`404 - 路由不存在: ${req.method} ${req.originalUrl}`)
   res.status(404).json({
     success: false,
-    message: `接口不存在: ${req.method} ${req.originalUrl}`
+    message: `接口不存在: ${req.method} ${req.originalUrl}`,
+    availableEndpoints: [
+      'GET  /health',
+      'POST /login', 
+      'POST /api/login',
+      'GET  /api/classes',
+      'POST /api/inputdata',
+      'GET  /api/reports/today/stats',
+      'GET  /api/reports/today/details'
+    ]
   })
 })
 
@@ -234,6 +322,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('  GET  /health - 健康检查')
   console.log('  POST /login - 用户登录')
   console.log('  POST /api/login - TOTP登录')
+  console.log('  GET  /api/classes - 班级列表')
+  console.log('  POST /api/inputdata - 提交通报')
   console.log('  GET  /api/reports/today/stats - 今日统计')
   console.log('  GET  /api/reports/today/details - 今日详情')
   console.log('\n🔄 服务器正在运行，等待连接...')
