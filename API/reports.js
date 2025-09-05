@@ -476,4 +476,116 @@ router.post('/inputdata', requireDatabase, validateRequired(['class', 'isadd', '
   }
 }))
 
+// 获取历史记录（按班级和日期范围查询）
+router.get('/reports/history', requireDatabase, asyncHandler(async (req, res) => {
+  const { classId, startDate, endDate, isadd, minScore, maxScore } = req.query
+  
+  try {
+    const client = await global.dbContext.instance.connect()
+    
+    // 构建查询条件
+    let whereConditions = []
+    let queryParams = []
+    let paramIndex = 1
+    
+    // 班级筛选
+    if (classId && classId !== 'all') {
+      whereConditions.push(`class = $${paramIndex}`)
+      queryParams.push(parseInt(classId))
+      paramIndex++
+    }
+    
+    // 日期范围筛选
+    if (startDate && endDate) {
+      whereConditions.push(`date_partition BETWEEN $${paramIndex}::date AND $${paramIndex + 1}::date`)
+      queryParams.push(startDate, endDate)
+      paramIndex += 2
+    }
+    
+    // 加分/扣分筛选
+    if (isadd !== undefined && isadd !== 'all') {
+      whereConditions.push(`isadd = $${paramIndex}`)
+      queryParams.push(isadd === 'true')
+      paramIndex++
+    }
+    
+    // 分数范围筛选
+    if (minScore) {
+      whereConditions.push(`changescore >= $${paramIndex}`)
+      queryParams.push(parseInt(minScore))
+      paramIndex++
+    }
+    
+    if (maxScore) {
+      whereConditions.push(`changescore <= $${paramIndex}`)
+      queryParams.push(parseInt(maxScore))
+      paramIndex++
+    }
+    
+    // 构建完整查询
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
+    
+    const query = `
+      SELECT 
+        id,
+        class,
+        isadd,
+        changescore,
+        note,
+        submitter,
+        submittime,
+        date_partition
+      FROM reports 
+      ${whereClause}
+      ORDER BY submittime DESC
+      LIMIT 1000
+    `
+    
+    const result = await client.query(query, queryParams)
+    
+    // 为每条记录注入班主任信息
+    const reports = result.rows.map(report => ({
+      ...report,
+      headteacher: getHeadteacher(report.class),
+      type: report.isadd ? '表彰' : '违纪',
+      scoreDisplay: report.isadd ? `+${report.changescore}` : `-${report.changescore}`
+    }))
+    
+    // 统计信息
+    const stats = {
+      total: reports.length,
+      praise: reports.filter(r => r.isadd).length,
+      criticism: reports.filter(r => !r.isadd).length,
+      totalPraiseScore: reports.filter(r => r.isadd).reduce((sum, r) => sum + r.changescore, 0),
+      totalCriticismScore: reports.filter(r => !r.isadd).reduce((sum, r) => sum + r.changescore, 0),
+      classCount: new Set(reports.map(r => r.class)).size
+    }
+    
+    client.release()
+    
+    res.json({
+      success: true,
+      data: {
+        reports,
+        stats,
+        query: {
+          classId: classId || 'all',
+          startDate,
+          endDate,
+          isadd: isadd || 'all',
+          minScore,
+          maxScore
+        }
+      }
+    })
+    
+  } catch (error) {
+    console.error('获取历史记录失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取历史记录失败'
+    })
+  }
+}))
+
 module.exports = router
