@@ -3,42 +3,63 @@ const router = express.Router()
 const dbAdapter = require('../utils/db-adapter')
 const { getHeadteacher } = require('../utils/headteachers')
 
-// 提交通报数据
+// 提交通报数据 - 修复路由路径
 router.post('/inputdata', async (req, res) => {
   try {
-    const { class: classNum, isadd, changescore, note, submitter } = req.body
+    console.log('📝 收到通报提交请求:', req.body)
+    
+    const { class: classNum, isadd, changescore, note, submitter, reducetype } = req.body
 
     // 验证必需字段
     if (!classNum || isadd === undefined || !changescore || !note || !submitter) {
+      console.log('❌ 缺少必需字段:', { classNum, isadd, changescore, note, submitter })
       return res.status(400).json({
         success: false,
         message: '缺少必需字段'
       })
     }
 
-    // 使用数据库适配器添加报告
-    const result = await dbAdapter.addReport({
-      class: classNum,
-      isadd,
-      changescore,
-      note,
-      submitter
-    })
+    // 验证数据范围
+    if (changescore < 1 || changescore > 20) {
+      return res.status(400).json({
+        success: false,
+        message: '分数必须在1-20之间'
+      })
+    }
 
-    console.log(`数据已插入, 记录ID: ${result.id}, 月份分区: ${result.database}`)
+    // 准备要插入的数据
+    const reportData = {
+      class: parseInt(classNum),
+      isadd,
+      changescore: parseInt(changescore),
+      note,
+      submitter,
+      reducetype: !isadd ? reducetype : undefined // 只有违纪才有违纪类型
+    }
+
+    console.log('💾 准备插入数据:', reportData)
+
+    // 使用数据库适配器添加报告
+    const result = await dbAdapter.addReport(reportData)
+
+    console.log(`✅ 数据已插入, 记录ID: ${result.id}, 月份分区: ${result.database}`)
 
     res.json({
       success: true,
       message: '数据提交成功',
-      id: result.id,
-      database: result.database,
-      submittime: result.submittime
+      data: {
+        id: result.id,
+        database: result.database,
+        submittime: result.submittime,
+        class: reportData.class,
+        headteacher: getHeadteacher(reportData.class)
+      }
     })
   } catch (error) {
-    console.error('数据提交错误:', error)
+    console.error('❌ 数据提交错误:', error)
     res.status(500).json({
       success: false,
-      message: '服务器内部错误'
+      message: '服务器内部错误: ' + error.message
     })
   }
 })

@@ -193,51 +193,56 @@ async function initializeDatabase() {
 }
 
 // 添加报告数据
-async function addReport(data) {
-  const { class: classNum, isadd, changescore, note, submitter, reducetype } = data
+async function addReport(reportData) {
+  const { class: classNum, isadd, changescore, note, submitter, reducetype } = reportData
   
-  const client = await global.dbContext.instance.connect()
+  // 获取当前月份用于分区
+  const now = new Date()
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const datePartition = now.toISOString().split('T')[0] // YYYY-MM-DD
+  
+  console.log(`📊 准备插入数据到分区 ${yearMonth}:`, reportData)
+  
+  const client = await pool.connect()
   
   try {
-    // 在应用端计算日期分区
-    const now = new Date()
-    const datePartition = now.toISOString().split('T')[0] // YYYY-MM-DD格式
+    // 检查表是否存在 reducetype 列
+    const columnCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'reports' AND column_name = 'reducetype'
+    `)
     
-    // 验证违纪类型：只有扣分时才能有违纪类型
-    if (!isadd && reducetype && !['discipline', 'hygiene'].includes(reducetype)) {
-      throw new Error('违纪类型只能是 discipline 或 hygiene')
+    const hasReduceType = columnCheck.rows.length > 0
+    
+    let query, values
+    
+    if (hasReduceType) {
+      // 如果有 reducetype 列，包含它
+      query = `
+        INSERT INTO reports (class, isadd, changescore, note, submitter, submittime, date_partition, reducetype)
+        VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
+        RETURNING id, submittime
+      `
+      values = [classNum, isadd, changescore, note, submitter, datePartition, reducetype]
+    } else {
+      // 如果没有 reducetype 列，不包含它
+      query = `
+        INSERT INTO reports (class, isadd, changescore, note, submitter, submittime, date_partition)
+        VALUES ($1, $2, $3, $4, $5, NOW(), $6)
+        RETURNING id, submittime
+      `
+      values = [classNum, isadd, changescore, note, submitter, datePartition]
     }
     
-    if (isadd && reducetype) {
-      throw new Error('表彰记录不能设置违纪类型')
-    }
-    
-    // 插入数据，包含违纪类型字段
-    const query = `
-      INSERT INTO reports 
-      (class, isadd, changescore, note, submitter, reducetype, submittime, date_partition)
-      VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, $7)
-      RETURNING id, submittime
-    `
-    
-    const values = [
-      parseInt(classNum),
-      Boolean(isadd),
-      parseInt(changescore),
-      note,
-      submitter,
-      !isadd ? reducetype : null, // 只有扣分时才设置违纪类型
-      datePartition
-    ]
+    console.log('🔍 执行SQL:', query)
+    console.log('📋 参数:', values)
     
     const result = await client.query(query, values)
     
     return {
-      success: true,
       id: result.rows[0].id,
       submittime: result.rows[0].submittime,
-      date_partition: datePartition,
-      reducetype: !isadd ? reducetype : null
+      database: yearMonth
     }
   } finally {
     client.release()

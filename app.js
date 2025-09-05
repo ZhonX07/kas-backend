@@ -48,6 +48,10 @@ app.get('/health', (req, res) => {
   })
 })
 
+// API路由注册 - 确保正确的顺序和路径
+app.use('/api', require('./API/inputdata'))  // 处理 /api/inputdata
+app.use('/api', require('./API/reports'))    // 处理其他报告相关路由
+
 // 创建HTTP服务器
 const server = http.createServer(app)
 
