@@ -40,6 +40,9 @@ const pool = new Pool({
   max: parseInt(process.env.DB_MAX_CONNECTIONS || '20')
 })
 
+// Attach pool to the app object to make it accessible for shutdown
+app.set('dbPool', pool)
+
 // 全局数据库上下文
 global.dbContext = {
   type: 'postgres',
@@ -166,7 +169,9 @@ async function startServer() {
       console.log('收到SIGTERM信号，开始优雅关闭...')
       server.close(() => {
         console.log('服务器已关闭')
-        pool.end(() => {
+        // Retrieve the pool from the app object
+        const dbPool = app.get('dbPool')
+        dbPool.end(() => {
           console.log('数据库连接池已关闭')
           process.exit(0)
         })
