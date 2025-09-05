@@ -12,7 +12,24 @@ const { broadcastReport } = require('../websocket')
 
 const router = express.Router()
 
-// 获取历史记录（按班级和日期范围查询）- 移到更前面，避免被 /:yearMonth 路由匹配
+// 获取所有班级列表（包含班主任信息）- 放在最前面
+router.get('/classes', asyncHandler(async (req, res) => {
+  try {
+    const classes = getAllClasses()
+    
+    res.json({
+      success: true,
+      data: classes
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: '获取班级列表失败'
+    })
+  }
+}))
+
+// 获取历史记录（按班级和日期范围查询）- 放在具体路由前面
 router.get('/reports/history', requireDatabase, asyncHandler(async (req, res) => {
   const { classId, startDate, endDate, isadd, minScore, maxScore } = req.query
   
@@ -61,6 +78,14 @@ router.get('/reports/history', requireDatabase, asyncHandler(async (req, res) =>
     // 构建完整查询
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
     
+    // 检查表是否包含 reducetype 字段
+    const columnCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'reports' AND column_name = 'reducetype'
+    `)
+    
+    const hasReduceType = columnCheck.rows.length > 0
+    
     const query = `
       SELECT 
         id,
@@ -70,8 +95,7 @@ router.get('/reports/history', requireDatabase, asyncHandler(async (req, res) =>
         note,
         submitter,
         submittime,
-        date_partition,
-        reducetype
+        date_partition${hasReduceType ? ',\n        reducetype' : ''}
       FROM reports 
       ${whereClause}
       ORDER BY submittime DESC
@@ -123,23 +147,6 @@ router.get('/reports/history', requireDatabase, asyncHandler(async (req, res) =>
     res.status(500).json({
       success: false,
       message: '获取历史记录失败: ' + error.message
-    })
-  }
-}))
-
-// 获取所有班级列表（包含班主任信息）
-router.get('/classes', asyncHandler(async (req, res) => {
-  try {
-    const classes = getAllClasses()
-    
-    res.json({
-      success: true,
-      data: classes
-    })
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: '获取班级列表失败'
     })
   }
 }))
@@ -501,9 +508,83 @@ router.get('/reports/class/:classNum/range/:startDate/:endDate', requireDatabase
   }
 }))
 
+// 添加数据输入路由 - 用于提交新的通报
+router.post('/inputdata', requireDatabase, validateRequired(['class', 'isadd', 'changescore', 'note']), asyncHandler(async (req, res) => {
+  try {
+    const { class: classNum, isadd, changescore, note, submitter, reducetype } = req.body
+    
+    // 验证数据
+    if (!classNum || typeof isadd !== 'boolean' || !changescore || !note) {
+      return res.status(400).json({
+        success: false,
+        message: '请填写所有必填字段'
+      })
+    }
+    
+    // 验证分数范围
+    if (changescore < 1 || changescore > 20) {
+      return res.status(400).json({
+        success: false,
+        message: '分数必须在1-20之间'
+      })
+    }
+    
+    // 验证违纪类型
+    if (!isadd && reducetype && !['discipline', 'hygiene'].includes(reducetype)) {
+      return res.status(400).json({
+        success: false,
+        message: '违纪类型只能是 discipline 或 hygiene'
+      })
+    }
+    
+    // 准备插入数据
+    const reportData = {
+      class: parseInt(classNum),
+      isadd: Boolean(isadd),
+      changescore: parseInt(changescore),
+      note: note.trim(),
+      submitter: submitter || '系统用户',
+      reducetype: !isadd ? reducetype : undefined // 只有违纪时才设置违纪类型
+    }
+    
+    // 调用数据库插入方法
+    const newReport = await addReport(reportData)
+    
+    // 广播到WebSocket客户端
+    try {
+      broadcastReport(newReport)
+      console.log('已广播新通报到WebSocket客户端')
+    } catch (broadcastError) {
+      console.warn('WebSocket广播失败:', broadcastError)
+    }
+    
+    res.json({
+      success: true,
+      message: '通报提交成功',
+      data: newReport
+    })
+    
+  } catch (error) {
+    console.error('提交通报失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '提交通报失败: ' + error.message
+    })
+  }
+}))
+
 // 获取特定月份的通报 - 移到最后，因为这个路由比较宽泛，容易匹配其他路径
+// 并且添加年月格式验证
 router.get('/reports/:yearMonth', requireDatabase, asyncHandler(async (req, res) => {
   const { yearMonth } = req.params
+  
+  // 验证年月格式 (YYYY-MM)
+  if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+    return res.status(400).json({
+      success: false,
+      message: '年月格式错误，请使用 YYYY-MM 格式'
+    })
+  }
   
   try {
     const reports = await getReportsByMonth(yearMonth)
@@ -534,62 +615,6 @@ router.post('/submit', async (req, res) => {
     // ...existing error handling...
   }
 })
-
-// 添加数据输入路由 - 用于提交新的通报
-router.post('/inputdata', requireDatabase, validateRequired(['class', 'isadd', 'changescore', 'note']), asyncHandler(async (req, res) => {
-  try {
-    const { class: classNum, isadd, changescore, note, submitter } = req.body
-    
-    // 验证数据
-    if (!classNum || typeof isadd !== 'boolean' || !changescore || !note) {
-      return res.status(400).json({
-        success: false,
-        message: '请填写所有必填字段'
-      })
-    }
-    
-    // 验证分数范围
-    if (changescore < 1 || changescore > 20) {
-      return res.status(400).json({
-        success: false,
-        message: '分数必须在1-20之间'
-      })
-    }
-    
-    // 准备插入数据
-    const reportData = {
-      class: parseInt(classNum),
-      isadd: Boolean(isadd),
-      changescore: parseInt(changescore),
-      note: note.trim(),
-      submitter: submitter || '系统用户'
-    }
-    
-    // 调用数据库插入方法
-    const newReport = await addReport(reportData)
-    
-    // 广播到WebSocket客户端
-    try {
-      broadcastReport(newReport)
-      console.log('已广播新通报到WebSocket客户端')
-    } catch (broadcastError) {
-      console.warn('WebSocket广播失败:', broadcastError)
-    }
-    
-    res.json({
-      success: true,
-      message: '通报提交成功',
-      data: newReport
-    })
-    
-  } catch (error) {
-    console.error('提交通报失败:', error)
-    res.status(500).json({
-      success: false,
-      message: '提交通报失败: ' + error.message
-    })
-  }
-}))
 
 // 辅助函数：获取违纪类型显示文本
 function getViolationType(reducetype) {
