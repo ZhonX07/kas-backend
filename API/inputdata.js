@@ -3,11 +3,14 @@ const router = express.Router()
 const dbAdapter = require('../utils/db-adapter')
 const { getHeadteacher } = require('../utils/headteachers')
 
-// 提交通报数据 - 修复路由路径
-router.post('/inputdata', async (req, res) => {
+console.log('📝 加载 inputdata 路由模块...')
+
+// 提交通报数据 - 确保路由路径正确
+router.post('/api/inputdata', async (req, res) => {
+  console.log('📝 收到通报提交请求:', req.body)
+  console.log('📍 请求路径:', req.originalUrl)
+  
   try {
-    console.log('📝 收到通报提交请求:', req.body)
-    
     const { class: classNum, isadd, changescore, note, submitter, reducetype } = req.body
 
     // 验证必需字段
@@ -15,7 +18,8 @@ router.post('/inputdata', async (req, res) => {
       console.log('❌ 缺少必需字段:', { classNum, isadd, changescore, note, submitter })
       return res.status(400).json({
         success: false,
-        message: '缺少必需字段'
+        message: '缺少必需字段',
+        received: { classNum, isadd, changescore, note, submitter }
       })
     }
 
@@ -64,25 +68,21 @@ router.post('/inputdata', async (req, res) => {
   }
 })
 
-// 查询接口 - 获取特定月份的通报 - 修复路径参数
-router.get('/reports/:yearMonth([0-9]{4}-[0-9]{2})', async (req, res) => {
-  try {
-    const { yearMonth } = req.params
+// 调试路由 - 列出所有注册的路由
+router.get('/api/debug/routes', (req, res) => {
+  res.json({
+    success: true,
+    message: 'inputdata 路由模块已加载',
+    routes: [
+      'POST /api/inputdata - 提交通报数据',
+      'GET /api/debug/routes - 调试信息'
+    ],
+    timestamp: new Date().toISOString()
+  })
+})
 
-    // 使用数据库适配器获取报告
-    const reports = await dbAdapter.getReportsByMonth(yearMonth)
-
-    res.json({
-      success: true,
-      data: reports
-    })
-  } catch (error) {
-    console.error('获取报告错误:', error)
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误'
-    })
-  }
+console.log('✅ inputdata 路由模块加载完成')
+module.exports = router
 })
 
 // 查询接口 - 获取特定日期的通报 - 修复路径参数

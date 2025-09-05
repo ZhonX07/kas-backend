@@ -52,12 +52,22 @@ app.get('/health', (req, res) => {
 console.log('📝 注册API路由...')
 
 // 先注册输入数据路由（包含 /api/inputdata）
-app.use('/', require('./API/inputdata'))  // 直接挂载，因为inputdata.js中已经有完整路径
+const inputDataRouter = require('./API/inputdata')
+app.use('/', inputDataRouter)  // 直接挂载，因为inputdata.js中已经有完整路径
+console.log('✅ inputdata 路由已注册')
 
 // 再注册其他报告相关路由
-app.use('/api', require('./API/reports'))    // 处理其他报告相关路由
+const reportsRouter = require('./API/reports')
+app.use('/api', reportsRouter)    // 处理其他报告相关路由
+console.log('✅ reports 路由已注册')
 
 console.log('✅ API路由注册完成')
+
+// 添加通用调试中间件 - 记录所有请求
+app.use('*', (req, res, next) => {
+  console.log(`🌐 收到请求: ${req.method} ${req.originalUrl}`)
+  next()
+})
 
 // 添加路由调试中间件
 app.use('/api/*', (req, res, next) => {
@@ -66,7 +76,13 @@ app.use('/api/*', (req, res, next) => {
     success: false,
     message: '路由不存在',
     path: req.originalUrl,
-    method: req.method
+    method: req.method,
+    availableRoutes: [
+      'POST /api/inputdata',
+      'GET /api/classes',
+      'GET /api/reports/today/stats',
+      'GET /api/reports/today/details'
+    ]
   })
 })
 
