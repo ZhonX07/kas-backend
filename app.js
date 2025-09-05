@@ -48,9 +48,27 @@ app.get('/health', (req, res) => {
   })
 })
 
-// API路由注册 - 确保正确的顺序和路径
-app.use('/api', require('./API/inputdata'))  // 处理 /api/inputdata
+// API路由注册 - 修复路由注册顺序和路径
+console.log('📝 注册API路由...')
+
+// 先注册输入数据路由（包含 /api/inputdata）
+app.use('/', require('./API/inputdata'))  // 直接挂载，因为inputdata.js中已经有完整路径
+
+// 再注册其他报告相关路由
 app.use('/api', require('./API/reports'))    // 处理其他报告相关路由
+
+console.log('✅ API路由注册完成')
+
+// 添加路由调试中间件
+app.use('/api/*', (req, res, next) => {
+  console.log(`❌ 未匹配的API路由: ${req.method} ${req.originalUrl}`)
+  res.status(404).json({
+    success: false,
+    message: '路由不存在',
+    path: req.originalUrl,
+    method: req.method
+  })
+})
 
 // 创建HTTP服务器
 const server = http.createServer(app)
