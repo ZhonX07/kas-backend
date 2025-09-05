@@ -43,8 +43,8 @@ router.post('/inputdata', async (req, res) => {
   }
 })
 
-// 查询接口 - 获取特定月份的通报
-router.get('/reports/:yearMonth', async (req, res) => {
+// 查询接口 - 获取特定月份的通报 - 修复路径参数
+router.get('/reports/:yearMonth([0-9]{4}-[0-9]{2})', async (req, res) => {
   try {
     const { yearMonth } = req.params
 
@@ -64,8 +64,8 @@ router.get('/reports/:yearMonth', async (req, res) => {
   }
 })
 
-// 查询接口 - 获取特定日期的通报
-router.get('/reports/date/:date', async (req, res) => {
+// 查询接口 - 获取特定日期的通报 - 修复路径参数
+router.get('/reports/date/:date([0-9]{4}-[0-9]{2}-[0-9]{2})', async (req, res) => {
   try {
     const { date } = req.params
 
@@ -93,8 +93,8 @@ router.get('/reports/date/:date', async (req, res) => {
   }
 })
 
-// 查询接口 - 获取特定日期和班级的通报
-router.get('/reports/date/:date/class/:classNum', async (req, res) => {
+// 查询接口 - 获取特定日期和班级的通报 - 修复路径参数
+router.get('/reports/date/:date([0-9]{4}-[0-9]{2}-[0-9]{2})/class/:classNum([0-9]+)', async (req, res) => {
   try {
     const { date, classNum } = req.params
 
@@ -130,8 +130,8 @@ router.get('/reports/date/:date/class/:classNum', async (req, res) => {
   }
 })
 
-// 查询接口 - 获取特定班级在日期范围内的通报
-router.get('/reports/class/:classNum/range/:startDate/:endDate', async (req, res) => {
+// 查询接口 - 获取特定班级在日期范围内的通报 - 修复路径参数
+router.get('/reports/class/:classNum([0-9]+)/range/:startDate([0-9]{4}-[0-9]{2}-[0-9]{2})/:endDate([0-9]{4}-[0-9]{2}-[0-9]{2})', async (req, res) => {
   try {
     const { classNum, startDate, endDate } = req.params
 

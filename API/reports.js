@@ -364,17 +364,9 @@ router.get('/reports/today/details', requireDatabase, asyncHandler(async (req, r
   }
 }))
 
-// 获取特定日期的通报 - 简化路径参数格式
-router.get('/reports/date/:date', requireDatabase, asyncHandler(async (req, res) => {
+// 获取特定日期的通报 - 修复路径参数格式
+router.get('/reports/date/:date([0-9]{4}-[0-9]{2}-[0-9]{2})', requireDatabase, asyncHandler(async (req, res) => {
   const { date } = req.params
-  
-  // 验证日期格式
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return res.status(400).json({
-      success: false,
-      message: '日期格式错误，请使用 YYYY-MM-DD 格式'
-    })
-  }
   
   try {
     const reports = await getReportsByDate(date)
@@ -476,24 +468,9 @@ router.get('/reports/date/:date', requireDatabase, asyncHandler(async (req, res)
   }
 }))
 
-// 获取特定日期和班级的通报 - 简化路径参数格式
-router.get('/reports/date/:date/class/:classNum', requireDatabase, asyncHandler(async (req, res) => {
+// 获取特定日期和班级的通报 - 修复路径参数格式
+router.get('/reports/date/:date([0-9]{4}-[0-9]{2}-[0-9]{2})/class/:classNum([0-9]+)', requireDatabase, asyncHandler(async (req, res) => {
   const { date, classNum } = req.params
-  
-  // 验证参数格式
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return res.status(400).json({
-      success: false,
-      message: '日期格式错误，请使用 YYYY-MM-DD 格式'
-    })
-  }
-  
-  if (!/^\d+$/.test(classNum)) {
-    return res.status(400).json({
-      success: false,
-      message: '班级号必须是数字'
-    })
-  }
   
   try {
     const reports = await getReportsByDateAndClass(date, classNum)
@@ -511,24 +488,9 @@ router.get('/reports/date/:date/class/:classNum', requireDatabase, asyncHandler(
   }
 }))
 
-// 获取班级在日期范围内的通报 - 简化路径参数格式
-router.get('/reports/class/:classNum/range/:startDate/:endDate', requireDatabase, asyncHandler(async (req, res) => {
+// 获取班级在日期范围内的通报 - 修复路径参数格式
+router.get('/reports/class/:classNum([0-9]+)/range/:startDate([0-9]{4}-[0-9]{2}-[0-9]{2})/:endDate([0-9]{4}-[0-9]{2}-[0-9]{2})', requireDatabase, asyncHandler(async (req, res) => {
   const { classNum, startDate, endDate } = req.params
-  
-  // 验证参数格式
-  if (!/^\d+$/.test(classNum)) {
-    return res.status(400).json({
-      success: false,
-      message: '班级号必须是数字'
-    })
-  }
-  
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
-    return res.status(400).json({
-      success: false,
-      message: '日期格式错误，请使用 YYYY-MM-DD 格式'
-    })
-  }
   
   try {
     const reports = await getReportsByClassAndDateRange(classNum, startDate, endDate)
@@ -546,17 +508,9 @@ router.get('/reports/class/:classNum/range/:startDate/:endDate', requireDatabase
   }
 }))
 
-// 获取特定月份的通报 - 移到最后，并简化路径参数
-router.get('/reports/:yearMonth', requireDatabase, asyncHandler(async (req, res) => {
+// 获取特定月份的通报 - 修复路径参数格式，移到最后
+router.get('/reports/:yearMonth([0-9]{4}-[0-9]{2})', requireDatabase, asyncHandler(async (req, res) => {
   const { yearMonth } = req.params
-  
-  // 验证年月格式 (YYYY-MM)
-  if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
-    return res.status(400).json({
-      success: false,
-      message: '年月格式错误，请使用 YYYY-MM 格式'
-    })
-  }
   
   try {
     const reports = await getReportsByMonth(yearMonth)
