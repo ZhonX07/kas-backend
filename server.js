@@ -116,10 +116,12 @@ app.get('/health', (req, res) => {
 // 导入路由
 const reportsRoutes = require('./API/reports')
 const authRoutes = require('./API/auth')
+const inputDataRoutes = require('./API/inputdata') // 导入inputdata路由
 
 // 注册路由
 app.use('/api', reportsRoutes)
 app.use('/api', authRoutes)
+app.use('/api', inputDataRoutes) // 注册inputdata路由
 
 // 全局错误处理中间件
 app.use((err, req, res, next) => {
