@@ -192,21 +192,21 @@ async function initializeDatabase() {
   }
 }
 
-// 添加报告数据
+// 添加通报记录
 async function addReport(reportData) {
-  const { class: classNum, isadd, changescore, note, submitter, reducetype } = reportData
-  
-  // 获取当前月份用于分区
-  const now = new Date()
-  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const datePartition = now.toISOString().split('T')[0] // YYYY-MM-DD
-  
-  console.log(`📊 准备插入数据到分区 ${yearMonth}:`, reportData)
-  
+  if (!global.dbContext || !global.dbContext.isReady) {
+    throw new Error('数据库连接未就绪')
+  }
+
+  const pool = global.dbContext.instance
   const client = await pool.connect()
   
   try {
-    // 检查表是否存在 reducetype 列
+    const { class: classNum, isadd, changescore, note, submitter, reducetype } = reportData
+    const today = new Date().toISOString().split('T')[0]
+    const currentMonth = new Date().toISOString().slice(0, 7)
+    
+    // 检查表是否存在 reducetype 字段
     const columnCheck = await client.query(`
       SELECT column_name FROM information_schema.columns 
       WHERE table_name = 'reports' AND column_name = 'reducetype'
@@ -217,33 +217,37 @@ async function addReport(reportData) {
     let query, values
     
     if (hasReduceType) {
-      // 如果有 reducetype 列，包含它
       query = `
         INSERT INTO reports (class, isadd, changescore, note, submitter, submittime, date_partition, reducetype)
         VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
         RETURNING id, submittime
       `
-      values = [classNum, isadd, changescore, note, submitter, datePartition, reducetype]
+      values = [classNum, isadd, changescore, note, submitter, today, reducetype]
     } else {
-      // 如果没有 reducetype 列，不包含它
       query = `
         INSERT INTO reports (class, isadd, changescore, note, submitter, submittime, date_partition)
         VALUES ($1, $2, $3, $4, $5, NOW(), $6)
         RETURNING id, submittime
       `
-      values = [classNum, isadd, changescore, note, submitter, datePartition]
+      values = [classNum, isadd, changescore, note, submitter, today]
     }
     
-    console.log('🔍 执行SQL:', query)
-    console.log('📋 参数:', values)
+    console.log('🔄 执行插入查询:', query, values)
     
     const result = await client.query(query, values)
     
+    const inserted = result.rows[0]
+    console.log('✅ 数据插入成功:', inserted)
+    
     return {
-      id: result.rows[0].id,
-      submittime: result.rows[0].submittime,
-      database: yearMonth
+      id: inserted.id,
+      submittime: inserted.submittime,
+      database: currentMonth
     }
+    
+  } catch (error) {
+    console.error('❌ 数据库插入失败:', error)
+    throw error
   } finally {
     client.release()
   }

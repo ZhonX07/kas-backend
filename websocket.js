@@ -13,7 +13,7 @@ function initWebSocket(server) {
   })
   
   wss.on('connection', (ws) => {
-    console.log('WebSocket客户端已连接')
+    console.log('📡 WebSocket客户端已连接')
     
     // 设置客户端标识
     ws.clientId = Date.now() + Math.random().toString(36).substr(2, 5)
@@ -27,7 +27,7 @@ function initWebSocket(server) {
     ws.on('message', (message) => {
       try {
         const data = JSON.parse(message)
-        console.log(`收到来自客户端 ${ws.clientId} 的消息:`, data)
+        console.log(`📨 收到来自客户端 ${ws.clientId} 的消息:`, data)
         
         // 处理客户端消息
         if (data.type === 'subscribe') {
@@ -40,18 +40,20 @@ function initWebSocket(server) {
             channels: ws.channels,
             message: `已订阅频道: ${ws.channels.join(', ')}`
           }))
+          
+          console.log(`✅ 客户端 ${ws.clientId} 已订阅频道: ${ws.channels.join(', ')}`)
         }
       } catch (error) {
-        console.error('解析WebSocket消息失败:', error)
+        console.error('❌ 解析WebSocket消息失败:', error)
       }
     })
     
     ws.on('close', () => {
-      console.log(`WebSocket客户端 ${ws.clientId} 已断开`)
+      console.log(`📡 WebSocket客户端 ${ws.clientId} 已断开`)
     })
     
     ws.on('error', (error) => {
-      console.error(`WebSocket客户端 ${ws.clientId} 错误:`, error)
+      console.error(`❌ WebSocket客户端 ${ws.clientId} 错误:`, error)
     })
     
     // 发送初始连接消息
@@ -67,7 +69,7 @@ function initWebSocket(server) {
   const pingIntervalId = setInterval(() => {
     wss.clients.forEach((ws) => {
       if (ws.isAlive === false) {
-        console.log(`关闭无响应的客户端 ${ws.clientId}`)
+        console.log(`🔌 关闭无响应的客户端 ${ws.clientId}`)
         return ws.terminate()
       }
       
@@ -81,21 +83,21 @@ function initWebSocket(server) {
     clearInterval(pingIntervalId)
   })
   
-  console.log('WebSocket服务器已初始化')
+  console.log('📡 WebSocket服务器已初始化')
   return wss
 }
 
 // 向所有订阅的客户端广播消息
 function broadcastReport(report, channel = 'reports') {
   if (!wss) {
-    console.warn('WebSocket服务器未初始化，无法广播消息')
-    return
+    console.warn('⚠️  WebSocket服务器未初始化，无法广播消息')
+    return 0
   }
   
-  console.log(`广播 ${channel} 消息:`, report)
+  console.log(`📢 广播 ${channel} 消息到所有客户端:`, report)
   
   const message = JSON.stringify({
-    type: 'newReport',
+    type: 'new-report',
     channel,
     data: report,
     time: new Date().toISOString()
@@ -109,12 +111,16 @@ function broadcastReport(report, channel = 'reports') {
       client.subscribed && 
       (!client.channels || client.channels.includes(channel))
     ) {
-      client.send(message)
-      sentCount++
+      try {
+        client.send(message)
+        sentCount++
+      } catch (error) {
+        console.error(`❌ 发送消息到客户端 ${client.clientId} 失败:`, error)
+      }
     }
   })
   
-  console.log(`消息已发送给 ${sentCount} 个客户端`)
+  console.log(`✅ 消息已发送给 ${sentCount} 个客户端`)
   return sentCount
 }
 

@@ -197,24 +197,36 @@ app.post('/api/inputdata', (req, res) => {
     changescore: parseInt(changescore),
     note,
     submitter,
-    submittime: result.submittime
+    submittime: result.submittime,
+    reducetype
   }
 
+  let broadcastCount = 0
   // 发送给所有订阅的WebSocket客户端
   wss.clients.forEach((ws) => {
     if (ws.readyState === WebSocket.OPEN && ws.subscribed) {
-      ws.send(JSON.stringify({
-        type: 'new-report',
-        data: newReport,
-        message: '新通报已提交'
-      }))
+      try {
+        ws.send(JSON.stringify({
+          type: 'new-report',
+          data: newReport,
+          message: '新通报已提交'
+        }))
+        broadcastCount++
+      } catch (error) {
+        console.error('❌ 广播消息失败:', error)
+      }
     }
   })
+
+  console.log(`📡 已向 ${broadcastCount} 个客户端广播新通报`)
 
   res.json({
     success: true,
     message: '数据提交成功',
-    data: result
+    data: {
+      ...result,
+      broadcastCount
+    }
   })
 })
 
