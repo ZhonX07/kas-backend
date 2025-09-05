@@ -8,28 +8,28 @@ const { Pool } = require('pg')
 
 const testData = [
   { class: 1, isadd: true, changescore: 5, note: '积极参与课堂讨论', submitter: '李晓鹏' },
-  { class: 1, isadd: false, changescore: 3, note: '课堂玩手机', submitter: '李晓鹏' },
+  { class: 1, isadd: false, changescore: 3, note: '课堂玩手机', submitter: '李晓鹏', reducetype: 'discipline' },
   { class: 2, isadd: true, changescore: 3, note: '帮助同学解题', submitter: '李晓鹏' },
-  { class: 2, isadd: false, changescore: 2, note: '迟到5分钟', submitter: '李晓鹏' },
+  { class: 2, isadd: false, changescore: 2, note: '迟到5分钟', submitter: '李晓鹏', reducetype: 'discipline' },
   { class: 3, isadd: true, changescore: 4, note: '作业完成质量高', submitter: '李晓鹏' },
-  { class: 3, isadd: false, changescore: 5, note: '课堂睡觉', submitter: '李晓鹏' },
+  { class: 3, isadd: false, changescore: 5, note: '课堂睡觉', submitter: '李晓鹏', reducetype: 'discipline' },
   { class: 4, isadd: true, changescore: 2, note: '主动清洁教室', submitter: '李晓鹏' },
-  { class: 4, isadd: false, changescore: 4, note: '不服从班干部管理', submitter: '李晓鹏' },
+  { class: 4, isadd: false, changescore: 4, note: '垃圾未倒', submitter: '李晓鹏', reducetype: 'hygiene' },
   { class: 5, isadd: true, changescore: 6, note: '在学科竞赛中获奖', submitter: '李晓鹏' },
-  { class: 5, isadd: false, changescore: 1, note: '忘记带作业', submitter: '李晓鹏' },
+  { class: 5, isadd: false, changescore: 1, note: '忘记带作业', submitter: '李晓鹏', reducetype: 'discipline' },
   { class: 6, isadd: true, changescore: 3, note: '课间维持纪律', submitter: '李晓鹏' },
-  { class: 7, isadd: false, changescore: 3, note: '在走廊大声喧哗', submitter: '李晓鹏' },
+  { class: 7, isadd: false, changescore: 3, note: '在走廊大声喧哗', submitter: '李晓鹏', reducetype: 'discipline' },
   { class: 8, isadd: true, changescore: 4, note: '帮助老师搬运教具', submitter: '李晓鹏' },
-  { class: 9, isadd: false, changescore: 2, note: '课堂传纸条', submitter: '李晓鹏' },
+  { class: 9, isadd: false, changescore: 2, note: '课堂传纸条', submitter: '李晓鹏', reducetype: 'discipline' },
   { class: 10, isadd: true, changescore: 5, note: '组织班级文艺活动', submitter: '李晓鹏' },
   { class: 15, isadd: true, changescore: 3, note: '主动帮助新同学', submitter: '李晓鹏' },
-  { class: 16, isadd: false, changescore: 4, note: '课间打闹', submitter: '李晓鹏' },
+  { class: 16, isadd: false, changescore: 4, note: '课间打闹', submitter: '李晓鹏', reducetype: 'discipline' },
   { class: 17, isadd: true, changescore: 2, note: '拾金不昧', submitter: '李晓鹏' },
-  { class: 18, isadd: false, changescore: 3, note: '不按时交作业', submitter: '李晓鹏' },
+  { class: 18, isadd: false, changescore: 3, note: '不按时交作业', submitter: '李晓鹏', reducetype: 'discipline' },
   { class: 19, isadd: true, changescore: 4, note: '积极参与社团活动', submitter: '李晓鹏' },
-  { class: 21, isadd: false, changescore: 2, note: '带零食进教室', submitter: '李晓鹏' },
+  { class: 21, isadd: false, changescore: 2, note: '带零食进教室', submitter: '李晓鹏', reducetype: 'hygiene' },
   { class: 22, isadd: true, changescore: 3, note: '主动值日', submitter: '李晓鹏' },
-  { class: 24, isadd: false, changescore: 5, note: '与同学发生冲突', submitter: '李晓鹏' }
+  { class: 24, isadd: false, changescore: 5, note: '与同学发生冲突', submitter: '李晓鹏', reducetype: 'discipline' }
 ]
 
 async function insertTestData() {
@@ -49,18 +49,19 @@ async function insertTestData() {
       
       await pool.query(`
         INSERT INTO reports 
-        (class, isadd, changescore, note, submitter, submittime, date_partition)
-        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6)
+        (class, isadd, changescore, note, submitter, reducetype, submittime, date_partition)
+        VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, $7)
       `, [
         data.class,
         data.isadd,
         data.changescore,
         data.note,
         data.submitter,
+        data.reducetype || null,
         today
       ])
       
-      console.log(`✅ 插入数据: ${data.class}班 - ${data.isadd ? '加分' : '扣分'} ${data.changescore}分 - ${data.note}`)
+      console.log(`✅ 插入数据: ${data.class}班 - ${data.isadd ? '加分' : '扣分'} ${data.changescore}分 - ${data.note}${data.reducetype ? ` (${data.reducetype === 'discipline' ? '纪律违纪' : '卫生违纪'})` : ''}`)
     }
 
     console.log(`\n🎉 成功插入 ${testData.length} 条测试数据！`)

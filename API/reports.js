@@ -12,7 +12,7 @@ const { broadcastReport } = require('../websocket')
 
 const router = express.Router()
 
-// 获取历史记录（按班级和日期范围查询）- 移到更前面，避免被 /:yearMonth 路由匹配
+// 获取历史记录（按班级和日期范围查询）
 router.get('/reports/history', requireDatabase, asyncHandler(async (req, res) => {
   const { classId, startDate, endDate, isadd, minScore, maxScore } = req.query
   
@@ -70,7 +70,8 @@ router.get('/reports/history', requireDatabase, asyncHandler(async (req, res) =>
         note,
         submitter,
         submittime,
-        date_partition
+        date_partition,
+        reducetype
       FROM reports 
       ${whereClause}
       ORDER BY submittime DESC
@@ -79,11 +80,11 @@ router.get('/reports/history', requireDatabase, asyncHandler(async (req, res) =>
     
     const result = await client.query(query, queryParams)
     
-    // 为每条记录注入班主任信息
+    // 为每条记录注入班主任信息和违纪类型显示
     const reports = result.rows.map(report => ({
       ...report,
       headteacher: getHeadteacher(report.class),
-      type: report.isadd ? '表彰' : '违纪',
+      type: report.isadd ? '表彰' : getViolationType(report.reducetype),
       scoreDisplay: report.isadd ? `+${report.changescore}` : `-${report.changescore}`
     }))
     
@@ -587,5 +588,19 @@ router.post('/inputdata', requireDatabase, validateRequired(['class', 'isadd', '
     })
   }
 }))
+
+// 辅助函数：获取违纪类型显示文本
+function getViolationType(reducetype) {
+  if (!reducetype) return '违纪'
+  
+  switch (reducetype) {
+    case 'discipline':
+      return '纪律违纪'
+    case 'hygiene':
+      return '卫生违纪'
+    default:
+      return '违纪'
+  }
+}
 
 module.exports = router

@@ -49,6 +49,7 @@ async function resetDatabase() {
         submittime TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         note TEXT NOT NULL,
         submitter TEXT NOT NULL,
+        reducetype VARCHAR(20) CHECK (reducetype IN ('discipline', 'hygiene')) DEFAULT NULL,
         date_partition DATE NOT NULL
       )
     `)
