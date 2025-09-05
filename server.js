@@ -2,7 +2,7 @@ require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const { Pool } = require('pg')
-const { setupWebSocket } = require('./websocket')
+const { initWebSocket } = require('./websocket')
 const { initializeDatabase } = require('./utils/db-adapter')
 
 const app = express()
@@ -155,8 +155,8 @@ async function startServer() {
       console.log(`📡 CORS允许的源: ${process.env.CORS_ALLOWED_ORIGINS || 'default'}`)
     })
 
-    // 设置WebSocket
-    setupWebSocket(server)
+    // Setup WebSocket
+    const wss = initWebSocket(server)
     console.log('🔌 WebSocket服务已启动')
 
     // 优雅关闭处理
