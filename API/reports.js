@@ -589,6 +589,109 @@ router.post('/submit', async (req, res) => {
   }
 })
 
+// 获取今日Excel报告数据 - 按班级顺序，先违纪后表彰
+router.get('/reports/today/excel', requireDatabase, asyncHandler(async (req, res) => {
+  const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD格式
+  
+  const client = await global.dbContext.instance.connect()
+  
+  try {
+    // 查询今日所有通报，按班级和类型排序（先违纪后表彰）
+    const query = `
+      SELECT 
+        id,
+        class,
+        isadd,
+        changescore,
+        note,
+        submitter,
+        submittime,
+        reducetype
+      FROM reports 
+      WHERE date_partition = $1
+      ORDER BY class ASC, isadd ASC, submittime ASC
+    `
+    
+    const result = await client.query(query, [today])
+    
+    // 为每条记录注入班主任信息并格式化
+    const reports = result.rows.map(report => ({
+      id: report.id,
+      class: report.class,
+      headteacher: getHeadteacher(report.class),
+      isadd: report.isadd,
+      changescore: report.changescore,
+      note: report.note,
+      submitter: report.submitter,
+      submittime: report.submittime,
+      reducetype: report.reducetype,
+      // 格式化显示文本
+      typeText: report.isadd ? '表彰' : '违纪',
+      reduceTypeText: report.isadd ? '' : getViolationType(report.reducetype),
+      scoreDisplay: report.isadd ? `+${report.changescore}` : `-${report.changescore}`,
+      timeDisplay: new Date(report.submittime).toLocaleString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }))
+    
+    // 按班级分组
+    const reportsByClass = {}
+    reports.forEach(report => {
+      if (!reportsByClass[report.class]) {
+        reportsByClass[report.class] = {
+          class: report.class,
+          headteacher: report.headteacher,
+          violations: [],
+          praises: []
+        }
+      }
+      
+      if (report.isadd) {
+        reportsByClass[report.class].praises.push(report)
+      } else {
+        reportsByClass[report.class].violations.push(report)
+      }
+    })
+    
+    // 转换为数组并排序
+    const classReports = Object.values(reportsByClass)
+      .sort((a, b) => a.class - b.class)
+    
+    // 计算统计数据
+    const summary = {
+      date: today,
+      totalReports: reports.length,
+      totalViolations: reports.filter(r => !r.isadd).length,
+      totalPraises: reports.filter(r => r.isadd).length,
+      activeClasses: classReports.length,
+      generatedAt: new Date().toISOString()
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        summary,
+        reports,
+        classReports,
+        metadata: {
+          title: `垦利校区高三学部${new Date().getFullYear()}年${String(new Date().getMonth() + 1).padStart(2, '0')}月${String(new Date().getDate()).padStart(2, '0')}日违纪表彰通报`,
+          headers: ['班级', '班主任', '通报类型', '违纪类型', '原因', '分数变动', '通报提交人', '时间']
+        }
+      }
+    })
+    
+  } catch (error) {
+    console.error('获取Excel报告数据失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取Excel报告数据失败: ' + error.message
+    })
+  } finally {
+    client.release()
+  }
+}))
+
 // 辅助函数：获取违纪类型显示文本
 function getViolationType(reducetype) {
   if (!reducetype) return '违纪'
