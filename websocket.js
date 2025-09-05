@@ -2,9 +2,15 @@ const WebSocket = require('ws')
 
 let wss = null
 
+const pingInterval = parseInt(process.env.WS_PING_INTERVAL || '30000')
+const maxClients = parseInt(process.env.WS_MAX_CLIENTS || '100')
+
 // 初始化WebSocket服务器
 function initWebSocket(server) {
-  wss = new WebSocket.Server({ server })
+  wss = new WebSocket.Server({ 
+    server,
+    maxClients: maxClients
+  })
   
   wss.on('connection', (ws) => {
     console.log('WebSocket客户端已连接')
@@ -57,8 +63,8 @@ function initWebSocket(server) {
     }))
   })
   
-  // 定期检查连接是否存活
-  const pingInterval = setInterval(() => {
+  // 定期检查WebSocket连接
+  const pingIntervalId = setInterval(() => {
     wss.clients.forEach((ws) => {
       if (ws.isAlive === false) {
         console.log(`关闭无响应的客户端 ${ws.clientId}`)
@@ -68,11 +74,11 @@ function initWebSocket(server) {
       ws.isAlive = false
       ws.ping()
     })
-  }, 30000) // 30秒检查一次
-  
+  }, pingInterval)
+
   // 服务器关闭时清理
   wss.on('close', () => {
-    clearInterval(pingInterval)
+    clearInterval(pingIntervalId)
   })
   
   console.log('WebSocket服务器已初始化')

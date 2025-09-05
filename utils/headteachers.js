@@ -16,7 +16,10 @@ function loadHeadteachers() {
   }
 
   try {
-    const filePath = path.join(__dirname, '../JSON/class.json')
+    // 从环境变量获取数据文件路径
+    const dataDir = process.env.DATA_DIR || '../JSON'
+    const filePath = path.join(__dirname, dataDir, 'class.json')
+    
     const data = fs.readFileSync(filePath, 'utf8')
     headteachersData = JSON.parse(data)
     console.log('✅ 班主任数据加载成功')
@@ -31,7 +34,8 @@ function loadHeadteachers() {
 function getHeadteacher(classNum) {
   const data = loadHeadteachers()
   const classItem = data.find(item => item.class === parseInt(classNum))
-  return classItem ? classItem.headteacher : `${classNum}班班主任`
+  const defaultTeacher = process.env.DEFAULT_HEADTEACHER_FORMAT || '{classNum}班班主任'
+  return classItem ? classItem.headteacher : defaultTeacher.replace('{classNum}', classNum)
 }
 
 // 获取所有班级列表

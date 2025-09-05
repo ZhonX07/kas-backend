@@ -5,10 +5,17 @@ const path = require('path')
 
 const router = express.Router()
 
+// 从环境变量获取配置
+const TOTP_WINDOW = parseInt(process.env.TOTP_WINDOW || '1')
+const TOTP_SECRET_LENGTH = parseInt(process.env.TOTP_SECRET_LENGTH || '32')
+
 // 读取2FA数据库
 function load2FADatabase() {
   try {
-    const dbPath = path.join(__dirname, '../JSON/2fabase.json')
+    // 从环境变量获取2FA数据库路径
+    const dataDir = process.env.DATA_DIR || '../JSON'
+    const dbPath = path.join(__dirname, dataDir, '2fabase.json')
+    
     const data = fs.readFileSync(dbPath, 'utf8')
     return JSON.parse(data)
   } catch (error) {
@@ -54,9 +61,9 @@ router.post('/login', (req, res) => {
       })
     }
 
-    // 验证TOTP (设置 ±1 时间窗口的容忍度，允许前后30秒的时间偏差)
+    // 验证TOTP
     const isValid = authenticator.check(totppass, userRecord.totp_secret, { 
-      window: 1  // 允许前后各1个时间窗口(30秒)的偏差
+      window: TOTP_WINDOW
     })
     
     if (isValid) {
