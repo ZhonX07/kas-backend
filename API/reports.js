@@ -12,7 +12,7 @@ const { broadcastReport } = require('../websocket')
 
 const router = express.Router()
 
-// 获取所有班级列表（包含班主任信息）- 放在最前面
+// 获取所有班级列表（包含班主任信息）- 确保路径正确
 router.get('/classes', asyncHandler(async (req, res) => {
   try {
     const classes = getAllClasses()

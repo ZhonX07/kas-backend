@@ -193,6 +193,7 @@ app.post('/api/inputdata', (req, res) => {
   const newReport = {
     id: result.id,
     class: parseInt(classNum),
+    headteacher: `班主任${classNum}`,
     isadd,
     changescore: parseInt(changescore),
     note,
@@ -208,10 +209,12 @@ app.post('/api/inputdata', (req, res) => {
       try {
         ws.send(JSON.stringify({
           type: 'new-report',
+          channel: 'reports',
           data: newReport,
-          message: '新通报已提交'
+          time: new Date().toISOString()
         }))
         broadcastCount++
+        console.log(`✅ 测试服务器消息已发送到客户端 ${ws.clientId}`)
       } catch (error) {
         console.error('❌ 广播消息失败:', error)
       }
@@ -226,6 +229,91 @@ app.post('/api/inputdata', (req, res) => {
     data: {
       ...result,
       broadcastCount
+    }
+  })
+})
+
+// 获取今日Excel报告数据
+app.get('/api/reports/today/excel', (req, res) => {
+  console.log('获取今日Excel报告数据')
+  
+  const reports = []
+  const reportCount = Math.floor(Math.random() * 15) + 5
+  
+  for (let i = 0; i < reportCount; i++) {
+    const isAdd = Math.random() > 0.4 // 60%概率是违纪，40%概率是表彰
+    const classNum = Math.floor(Math.random() * 18) + 1
+    const reducetype = isAdd ? null : (Math.random() > 0.5 ? 'discipline' : 'hygiene')
+    
+    reports.push({
+      id: i + 1,
+      class: classNum,
+      headteacher: `班主任${classNum}`,
+      isadd: isAdd,
+      changescore: Math.floor(Math.random() * 8) + 1,
+      note: isAdd ? 
+        ['积极参与课堂讨论', '帮助同学解决问题', '主动打扫卫生', '拾金不昧'][Math.floor(Math.random() * 4)] :
+        ['上课说话影响他人学习', '课间大声喧哗', '作业未按时完成', '迟到违反纪律'][Math.floor(Math.random() * 4)],
+      submitter: ['张老师', '李老师', '王老师', '赵老师', '陈老师'][Math.floor(Math.random() * 5)],
+      submittime: new Date(Date.now() - Math.random() * 3600000).toISOString(),
+      reducetype,
+      typeText: isAdd ? '表彰' : '违纪',
+      reduceTypeText: isAdd ? '' : (reducetype === 'discipline' ? '纪律违纪' : '卫生违纪'),
+      scoreDisplay: isAdd ? `+${Math.floor(Math.random() * 8) + 1}` : `-${Math.floor(Math.random() * 8) + 1}`,
+      timeDisplay: new Date(Date.now() - Math.random() * 3600000).toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    })
+  }
+  
+  // 按班级和类型排序（班级升序，违纪在前表彰在后）
+  reports.sort((a, b) => {
+    if (a.class !== b.class) return a.class - b.class
+    return a.isadd - b.isadd // false(违纪)在前，true(表彰)在后
+  })
+  
+  // 按班级分组
+  const reportsByClass = {}
+  reports.forEach(report => {
+    if (!reportsByClass[report.class]) {
+      reportsByClass[report.class] = {
+        class: report.class,
+        headteacher: report.headteacher,
+        violations: [],
+        praises: []
+      }
+    }
+    
+    if (report.isadd) {
+      reportsByClass[report.class].praises.push(report)
+    } else {
+      reportsByClass[report.class].violations.push(report)
+    }
+  })
+  
+  const classReports = Object.values(reportsByClass)
+    .sort((a, b) => a.class - b.class)
+  
+  const summary = {
+    date: new Date().toISOString().split('T')[0],
+    totalReports: reports.length,
+    totalViolations: reports.filter(r => !r.isadd).length,
+    totalPraises: reports.filter(r => r.isadd).length,
+    activeClasses: classReports.length,
+    generatedAt: new Date().toISOString()
+  }
+  
+  res.json({
+    success: true,
+    data: {
+      summary,
+      reports,
+      classReports,
+      metadata: {
+        title: `垦利校区高三学部${new Date().getFullYear()}年${String(new Date().getMonth() + 1).padStart(2, '0')}月${String(new Date().getDate()).padStart(2, '0')}日违纪表彰通报`,
+        headers: ['班级', '班主任', '通报类型', '违纪类型', '原因', '分数变动', '通报提交人', '时间']
+      }
     }
   })
 })

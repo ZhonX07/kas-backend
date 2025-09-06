@@ -96,10 +96,23 @@ function broadcastReport(report, channel = 'reports') {
   
   console.log(`📢 广播 ${channel} 消息到所有客户端:`, report)
   
+  // 确保消息格式统一
+  const standardizedReport = {
+    id: report.id,
+    class: Number(report.class),
+    headteacher: report.headteacher || `班主任${report.class}`,
+    isadd: Boolean(report.isadd),
+    changescore: Number(report.changescore),
+    note: String(report.note || ''),
+    submitter: String(report.submitter || '系统'),
+    submittime: report.submittime || new Date().toISOString(),
+    reducetype: report.reducetype || null
+  }
+  
   const message = JSON.stringify({
     type: 'new-report',
     channel,
-    data: report,
+    data: standardizedReport,
     time: new Date().toISOString()
   })
   
@@ -114,6 +127,7 @@ function broadcastReport(report, channel = 'reports') {
       try {
         client.send(message)
         sentCount++
+        console.log(`✅ 消息已发送到客户端 ${client.clientId}`)
       } catch (error) {
         console.error(`❌ 发送消息到客户端 ${client.clientId} 失败:`, error)
       }
